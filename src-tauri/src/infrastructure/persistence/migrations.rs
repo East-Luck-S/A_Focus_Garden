@@ -29,7 +29,8 @@ pub(crate) fn run_migrations_with(
     current_schema_version: i64,
 ) -> Result<i64, PersistenceError> {
     bootstrap_migration_tracking(connection)?;
-    let database_version = schema_version(connection)?;
+    let recorded_versions = migration_history_versions(connection)?;
+    let database_version = recorded_versions.last().copied().unwrap_or_default();
 
     if database_version > current_schema_version {
         return Err(PersistenceError::UnsupportedFutureSchema {
@@ -38,13 +39,17 @@ pub(crate) fn run_migrations_with(
         });
     }
 
+    validate_migration_history(&recorded_versions)?;
+
     for migration in migrations {
         if migration.version > database_version {
             apply_migration(connection, migration)?;
         }
     }
 
-    let final_version = schema_version(connection)?;
+    let final_versions = migration_history_versions(connection)?;
+    validate_migration_history(&final_versions)?;
+    let final_version = final_versions.last().copied().unwrap_or_default();
     if final_version != current_schema_version {
         return Err(PersistenceError::Migration(MigrationError::Failed {
             version: current_schema_version,
@@ -68,13 +73,29 @@ fn bootstrap_migration_tracking(connection: &Connection) -> Result<(), Persisten
     Ok(())
 }
 
-fn schema_version(connection: &Connection) -> Result<i64, PersistenceError> {
-    connection
-        .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
-            row.get::<_, Option<i64>>(0)
-        })
-        .map_err(PersistenceError::DatabaseOperation)
-        .map(|version| version.unwrap_or_default())
+fn migration_history_versions(connection: &Connection) -> Result<Vec<i64>, PersistenceError> {
+    let mut statement = connection
+        .prepare("SELECT version FROM schema_migrations ORDER BY version ASC")
+        .map_err(PersistenceError::DatabaseOperation)?;
+    let versions = statement
+        .query_map([], |row| row.get(0))
+        .map_err(PersistenceError::DatabaseOperation)?
+        .collect::<Result<Vec<i64>, _>>()
+        .map_err(PersistenceError::DatabaseOperation)?;
+    Ok(versions)
+}
+
+fn validate_migration_history(versions: &[i64]) -> Result<(), PersistenceError> {
+    let is_continuous_prefix = versions
+        .iter()
+        .enumerate()
+        .all(|(index, version)| *version == index as i64 + 1);
+
+    if is_continuous_prefix {
+        Ok(())
+    } else {
+        Err(PersistenceError::MigrationHistoryInvalid)
+    }
 }
 
 fn apply_migration(

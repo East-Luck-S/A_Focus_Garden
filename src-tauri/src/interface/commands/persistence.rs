@@ -55,6 +55,10 @@ impl From<PersistenceError> for NativeError {
                 "UNSUPPORTED_FUTURE_SCHEMA",
                 "This database was created by a newer version of Focus Garden.",
             ),
+            PersistenceError::MigrationHistoryInvalid => (
+                "MIGRATION_HISTORY_INVALID",
+                "The local database migration history is invalid.",
+            ),
             PersistenceError::Clock(_) => (
                 "CLOCK_UNAVAILABLE",
                 "The system clock is unavailable for persistence initialization.",

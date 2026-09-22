@@ -38,7 +38,7 @@ Only explicit Tauri commands are registered. M1 exposes `get_persistence_status`
 
 ## Schema evolution and timestamps
 
-`schema_migrations` is bootstrapped as infrastructure and every migration is an ordered registry entry executed within its own transaction. Version 1 creates only `app_metadata`. A database newer than `CURRENT_SCHEMA_VERSION` is rejected with `UNSUPPORTED_FUTURE_SCHEMA`; migrations never downgrade, reset, or alter historical migration definitions. Persisted timestamps use UTC Unix epoch milliseconds.
+`schema_migrations` is bootstrapped as infrastructure and every migration is an ordered registry entry executed within its own transaction. Recorded versions must form a continuous prefix beginning at 1 (for example, `[]`, `[1]`, or `[1,2]`); a gap is rejected with `MIGRATION_HISTORY_INVALID` before any pending migration runs. Version 1 creates only `app_metadata`. A database newer than `CURRENT_SCHEMA_VERSION` is rejected separately with `UNSUPPORTED_FUTURE_SCHEMA`; migrations never downgrade, reset, or alter historical migration definitions. Persisted timestamps use UTC Unix epoch milliseconds.
 
 ## Future plant renderer boundary
 

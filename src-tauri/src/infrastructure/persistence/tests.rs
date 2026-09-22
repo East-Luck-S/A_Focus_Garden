@@ -85,6 +85,60 @@ fn future_schema_is_rejected_without_downgrade() {
 }
 
 #[test]
+fn gapped_history_is_rejected_before_pending_migrations_run() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().expect("database should open");
+    seed_migration_history(&connection, &[1, 3]);
+    let fixture_registry = test_migration_registry();
+
+    let result = run_migrations_with(&mut connection, &fixture_registry, 3);
+
+    assert!(matches!(
+        result,
+        Err(PersistenceError::MigrationHistoryInvalid)
+    ));
+    assert!(!table_exists(&connection, "migration_two_applied"));
+}
+
+#[test]
+fn history_without_migration_one_is_rejected() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().expect("database should open");
+    seed_migration_history(&connection, &[2]);
+    let fixture_registry = test_migration_registry();
+
+    let result = run_migrations_with(&mut connection, &fixture_registry, 3);
+
+    assert!(matches!(
+        result,
+        Err(PersistenceError::MigrationHistoryInvalid)
+    ));
+}
+
+#[test]
+fn continuous_history_allows_the_next_test_migration() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().expect("database should open");
+    let fixture_registry = test_migration_registry();
+
+    run_migrations_with(&mut connection, &fixture_registry[..2], 2)
+        .expect("the first two fixture migrations should apply");
+    run_migrations_with(&mut connection, &fixture_registry, 3)
+        .expect("the continuous history should allow fixture migration three");
+
+    let versions: Vec<i64> = connection
+        .prepare("SELECT version FROM schema_migrations ORDER BY version ASC")
+        .expect("migration history query should prepare")
+        .query_map([], |row| row.get(0))
+        .expect("migration history query should run")
+        .collect::<Result<Vec<i64>, _>>()
+        .expect("migration history rows should decode");
+
+    assert_eq!(versions, vec![1, 2, 3]);
+    assert!(table_exists(&connection, "migration_three_applied"));
+}
+
+#[test]
 fn failing_migration_rolls_back_schema_and_tracking_record() {
     let (_directory, database) = test_database();
     let mut connection = database.open_connection().expect("database should open");
@@ -217,4 +271,66 @@ fn failing_migration(transaction: &rusqlite::Transaction<'_>) -> rusqlite::Resul
         "CREATE TABLE partial_fixture (value TEXT NOT NULL);
          INSERT INTO missing_fixture (value) VALUES ('fails');",
     )
+}
+
+fn seed_migration_history(connection: &rusqlite::Connection, versions: &[i64]) {
+    connection
+        .execute_batch(
+            "CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at INTEGER NOT NULL
+            );",
+        )
+        .expect("migration tracking fixture should be created");
+    for version in versions {
+        connection
+            .execute(
+                "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
+                params![version, format!("fixture-{version}"), 0_i64],
+            )
+            .expect("migration history fixture should be inserted");
+    }
+}
+
+fn test_migration_registry() -> [Migration; 3] {
+    [
+        Migration {
+            version: 1,
+            name: "001_fixture",
+            apply: successful_fixture_migration,
+        },
+        Migration {
+            version: 2,
+            name: "002_fixture",
+            apply: apply_migration_two_fixture,
+        },
+        Migration {
+            version: 3,
+            name: "003_fixture",
+            apply: apply_migration_three_fixture,
+        },
+    ]
+}
+
+fn successful_fixture_migration(_: &rusqlite::Transaction<'_>) -> rusqlite::Result<()> {
+    Ok(())
+}
+
+fn apply_migration_two_fixture(transaction: &rusqlite::Transaction<'_>) -> rusqlite::Result<()> {
+    transaction.execute_batch("CREATE TABLE migration_two_applied (value TEXT NOT NULL);")
+}
+
+fn apply_migration_three_fixture(transaction: &rusqlite::Transaction<'_>) -> rusqlite::Result<()> {
+    transaction.execute_batch("CREATE TABLE migration_three_applied (value TEXT NOT NULL);")
+}
+
+fn table_exists(connection: &rusqlite::Connection, table_name: &str) -> bool {
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+            [table_name],
+            |row| row.get(0),
+        )
+        .expect("table lookup should succeed")
 }

@@ -30,6 +30,8 @@ pub enum PersistenceError {
         database_version: i64,
         current_version: i64,
     },
+    #[error("migration history is not a continuous prefix starting at version 1")]
+    MigrationHistoryInvalid,
     #[error("system clock is unavailable")]
     Clock(#[source] SystemTimeError),
 }
