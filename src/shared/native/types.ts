@@ -31,3 +31,23 @@ export type FocusSessionSnapshot = {
   generatorVersion: number;
   plantGenome: import("../plant").PlantGenome;
 };
+
+export type GardenPlantSummary = {
+  id: string;
+  plantedAt: number;
+  generatorVersion: number;
+  plantGenome: import("../plant").PlantGenome;
+};
+
+export type GardenPlantDetail = GardenPlantSummary & {
+  plantSeed: string;
+  sourceSession: {
+    id: string;
+    plannedDurationMs: number;
+    startedAt: number;
+    targetEndAt: number;
+    completedAt: number;
+    totalPausedMs: number;
+    pauseCount: number;
+  };
+};

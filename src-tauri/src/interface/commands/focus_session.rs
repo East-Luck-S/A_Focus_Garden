@@ -3,7 +3,8 @@ use tauri::State;
 
 use crate::{
     application::focus_session_service::{
-        FocusSessionService, FocusSessionServiceError, FocusSessionSnapshot,
+        FocusSessionService, FocusSessionServiceError, FocusSessionSnapshot, GardenPlantDetail,
+        GardenPlantSummary,
     },
     domain::focus_session::RecoveryResolution,
     interface::commands::persistence::NativeError,
@@ -18,6 +19,33 @@ pub struct StartFocusSessionRequest {
 #[derive(Debug, Deserialize)]
 pub struct FocusSessionIdRequest {
     pub id: String,
+}
+
+#[tauri::command]
+pub fn finalize_focus_session(
+    request: FocusSessionIdRequest,
+    service: State<'_, FocusSessionService>,
+) -> Result<GardenPlantDetail, NativeError> {
+    service
+        .finalize_focus_session(&request.id)
+        .map_err(NativeError::from)
+}
+
+#[tauri::command]
+pub fn list_garden_plants(
+    service: State<'_, FocusSessionService>,
+) -> Result<Vec<GardenPlantSummary>, NativeError> {
+    service.list_garden_plants().map_err(NativeError::from)
+}
+
+#[tauri::command]
+pub fn get_garden_plant(
+    request: FocusSessionIdRequest,
+    service: State<'_, FocusSessionService>,
+) -> Result<GardenPlantDetail, NativeError> {
+    service
+        .get_garden_plant(&request.id)
+        .map_err(NativeError::from)
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,6 +133,14 @@ impl From<FocusSessionServiceError> for NativeError {
             FocusSessionServiceError::GenerationDataInvalid => Self {
                 code: "SESSION_GENERATION_DATA_INVALID",
                 message: "The stored plant preview for this focus session is invalid.",
+            },
+            FocusSessionServiceError::DataSafetyBlocker => Self {
+                code: "DATA_SAFETY_BLOCKER",
+                message: "Focus Garden stopped because its transactional journal is inconsistent.",
+            },
+            FocusSessionServiceError::PlantNotFound => Self {
+                code: "PLANT_NOT_FOUND",
+                message: "The requested garden plant was not found.",
             },
             FocusSessionServiceError::Domain(SessionError::TimeValueInvalid)
             | FocusSessionServiceError::TimeValueInvalid => Self {

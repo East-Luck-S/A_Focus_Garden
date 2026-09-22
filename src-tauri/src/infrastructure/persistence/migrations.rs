@@ -3,8 +3,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rusqlite::{params, Connection, Transaction};
 
 use super::{MigrationError, PersistenceError};
+use crate::domain::plant_bundle::validate_bundle;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 3;
+pub const CURRENT_SCHEMA_VERSION: i64 = 4;
 
 #[derive(Clone, Copy)]
 pub(crate) struct Migration {
@@ -28,6 +29,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 3,
         name: "003_session_plant_preview",
         apply: apply_session_plant_preview,
+    },
+    Migration {
+        version: 4,
+        name: "004_transactional_plants",
+        apply: apply_transactional_plants,
     },
 ];
 
@@ -60,6 +66,12 @@ pub(crate) fn run_migrations_with(
 
     for migration in migrations {
         if migration.version > database_version {
+            // This is deliberately inside the loop.  A v1/v2 database gets
+            // its v3 columns first, then is checked *before* 004 can write
+            // anything, exactly like a database that started at v3.
+            if migration.version == 4 {
+                preflight_v3_generation_data(connection)?;
+            }
             apply_migration(connection, migration)?;
         }
     }
@@ -75,6 +87,117 @@ pub(crate) fn run_migrations_with(
         }));
     }
     Ok(final_version)
+}
+
+/// Read-only v4 reconciliation.  It intentionally never creates a missing
+/// plant: a completed session without its transactional receipt is unsafe.
+pub fn audit_transactional_data(connection: &Connection) -> Result<(), PersistenceError> {
+    let version = migration_history_versions(connection)?
+        .last()
+        .copied()
+        .unwrap_or_default();
+    if version < 4 {
+        return Ok(());
+    }
+    let foreign_keys: i64 = connection
+        .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {
+            row.get(0)
+        })
+        .map_err(PersistenceError::DatabaseOperation)?;
+    if foreign_keys != 0 {
+        return Err(PersistenceError::DataSafetyBlocker);
+    }
+    let mut statement = connection.prepare(
+        "SELECT s.id, s.status, s.completed_at, s.plant_seed, s.generator_version, s.plant_genome_json,
+                p.id, p.planted_at, p.plant_seed, p.generator_version, p.plant_genome_json
+         FROM sessions s LEFT JOIN plants p ON p.source_session_id = s.id"
+    ).map_err(PersistenceError::DatabaseOperation)?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<i64>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<i64>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
+        })
+        .map_err(PersistenceError::DatabaseOperation)?;
+    for row in rows {
+        let (
+            _id,
+            status,
+            completed_at,
+            seed,
+            gen,
+            json,
+            plant_id,
+            planted_at,
+            plant_seed,
+            plant_gen,
+            plant_json,
+        ) = row.map_err(PersistenceError::DatabaseOperation)?;
+        match (seed.as_deref(), gen, json.as_deref()) {
+            (None, None, None) if status != "COMPLETED" => {}
+            (Some(seed), Some(version), Some(json))
+                if validate_bundle(seed, version, json).is_ok() => {}
+            _ => return Err(PersistenceError::DataSafetyBlocker),
+        }
+        if status == "COMPLETED" {
+            if plant_id.is_none()
+                || completed_at != planted_at
+                || seed != plant_seed
+                || gen != plant_gen
+                || json != plant_json
+            {
+                return Err(PersistenceError::DataSafetyBlocker);
+            }
+        } else if plant_id.is_some() {
+            return Err(PersistenceError::DataSafetyBlocker);
+        }
+    }
+    Ok(())
+}
+
+fn preflight_v3_generation_data(connection: &Connection) -> Result<(), PersistenceError> {
+    let mut statement = connection
+        .prepare("SELECT status, plant_seed, generator_version, plant_genome_json FROM sessions")
+        .map_err(PersistenceError::DatabaseOperation)?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })
+        .map_err(PersistenceError::DatabaseOperation)?;
+    for row in rows {
+        let (status, seed, version, genome) = row.map_err(PersistenceError::DatabaseOperation)?;
+        let complete_bundle = matches!((&seed, version, &genome), (Some(_), Some(_), Some(_)));
+        match (seed.as_deref(), version, genome.as_deref()) {
+            (None, None, None) if status != "COMPLETED" => {}
+            (Some(seed), Some(version), Some(genome)) => {
+                if validate_bundle(seed, version, genome).is_err()
+                    || status == "COMPLETED" && seed.is_empty()
+                {
+                    return Err(PersistenceError::DataSafetyBlocker);
+                }
+            }
+            _ => return Err(PersistenceError::DataSafetyBlocker),
+        }
+        if status == "COMPLETED" && !complete_bundle {
+            return Err(PersistenceError::DataSafetyBlocker);
+        }
+    }
+    Ok(())
 }
 
 fn bootstrap_migration_tracking(connection: &Connection) -> Result<(), PersistenceError> {
@@ -214,5 +337,37 @@ fn apply_session_plant_preview(transaction: &Transaction<'_>) -> rusqlite::Resul
          BEGIN
            SELECT RAISE(ABORT, 'session generation bundle must be all-null or all-present');
          END;",
+    )
+}
+
+fn apply_transactional_plants(transaction: &Transaction<'_>) -> rusqlite::Result<()> {
+    transaction.execute_batch(
+        "CREATE TABLE plants (
+            id TEXT PRIMARY KEY NOT NULL,
+            source_session_id TEXT NOT NULL UNIQUE REFERENCES sessions(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+            plant_seed TEXT NOT NULL CHECK (length(plant_seed) = 16 AND plant_seed NOT GLOB '*[^0-9a-f]*'),
+            generator_version INTEGER NOT NULL CHECK (generator_version > 0),
+            plant_genome_json TEXT NOT NULL CHECK (json_valid(plant_genome_json)),
+            planted_at INTEGER NOT NULL CHECK (planted_at >= 0)
+        );
+        CREATE INDEX plants_planted_at_id ON plants (planted_at DESC, id DESC);
+        INSERT INTO plants (id, source_session_id, plant_seed, generator_version, plant_genome_json, planted_at)
+          SELECT id, id, plant_seed, generator_version, plant_genome_json, completed_at
+          FROM sessions WHERE status = 'COMPLETED';
+        CREATE TRIGGER plants_must_exactly_match_completed_session
+        BEFORE INSERT ON plants
+        WHEN NOT EXISTS (SELECT 1 FROM sessions s WHERE s.id = NEW.source_session_id
+          AND s.status = 'COMPLETED' AND s.completed_at = NEW.planted_at
+          AND s.plant_seed = NEW.plant_seed AND s.generator_version = NEW.generator_version
+          AND s.plant_genome_json = NEW.plant_genome_json)
+        BEGIN SELECT RAISE(ABORT, 'plant must exactly match completed source session'); END;
+        CREATE TRIGGER plants_are_immutable_update BEFORE UPDATE ON plants
+        BEGIN SELECT RAISE(ABORT, 'plants are immutable'); END;
+        CREATE TRIGGER plants_are_immutable_delete BEFORE DELETE ON plants
+        BEGIN SELECT RAISE(ABORT, 'plants are immutable'); END;
+        CREATE TRIGGER completed_plants_protect_session
+        BEFORE UPDATE OF status, completed_at, plant_seed, generator_version, plant_genome_json ON sessions
+        WHEN EXISTS (SELECT 1 FROM plants p WHERE p.source_session_id = OLD.id)
+        BEGIN SELECT RAISE(ABORT, 'completed plant source session is immutable'); END;"
     )
 }

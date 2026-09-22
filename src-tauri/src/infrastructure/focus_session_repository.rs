@@ -90,8 +90,11 @@ fn decode_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<FocusSession> {
 
 fn map_write_error(error: rusqlite::Error) -> SessionRepositoryError {
     match &error {
-        rusqlite::Error::SqliteFailure(code, _)
-            if code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        rusqlite::Error::SqliteFailure(code, message)
+            if code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
+                && message
+                    .as_deref()
+                    .is_some_and(|value| value.contains("sessions_single_open_session")) =>
         {
             SessionRepositoryError::OpenSessionExists
         }

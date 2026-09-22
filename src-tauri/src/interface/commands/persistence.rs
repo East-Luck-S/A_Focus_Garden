@@ -31,6 +31,10 @@ impl From<AppError> for NativeError {
 impl From<PersistenceError> for NativeError {
     fn from(error: PersistenceError) -> Self {
         let (code, message) = match error {
+            PersistenceError::DataSafetyBlocker => (
+                "DATA_SAFETY_BLOCKER",
+                "Focus Garden stopped because its transactional journal is inconsistent.",
+            ),
             PersistenceError::Directory(_) => (
                 "PERSISTENCE_DIRECTORY_FAILURE",
                 "The persistence directory could not be prepared.",

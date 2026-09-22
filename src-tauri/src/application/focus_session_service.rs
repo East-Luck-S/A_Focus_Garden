@@ -3,7 +3,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::TransactionBehavior;
+use rusqlite::{OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::{
     domain::{
         focus_session::{FocusSession, RecoveryResolution, SessionError, SessionStatus},
+        plant_bundle::validate_bundle,
         plant_generator::{
             generate_plant, resolve_seed, PlantGenerationInput, PlantGenome,
             PLANT_GENERATOR_VERSION,
@@ -65,6 +66,38 @@ pub struct FocusSessionSnapshot {
     pub plant_seed: String,
     pub generator_version: i64,
     pub plant_genome: PlantGenome,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GardenPlantSummary {
+    pub id: String,
+    pub planted_at: i64,
+    pub generator_version: i64,
+    pub plant_genome: PlantGenome,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GardenPlantDetail {
+    pub id: String,
+    pub planted_at: i64,
+    pub plant_seed: String,
+    pub generator_version: i64,
+    pub plant_genome: PlantGenome,
+    pub source_session: GardenSourceSession,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GardenSourceSession {
+    pub id: String,
+    pub planned_duration_ms: i64,
+    pub started_at: i64,
+    pub target_end_at: i64,
+    pub completed_at: i64,
+    pub total_paused_ms: i64,
+    pub pause_count: i64,
 }
 
 impl FocusSessionService {
@@ -137,6 +170,79 @@ impl FocusSessionService {
         resolution: RecoveryResolution,
     ) -> Result<FocusSessionSnapshot, FocusSessionServiceError> {
         self.change(id, |session, now| session.resolve_recovery(resolution, now))
+    }
+
+    /// The only completion path: its session transition and immutable plant
+    /// receipt share one IMMEDIATE SQLite transaction.
+    pub fn finalize_focus_session(
+        &self,
+        id: &str,
+    ) -> Result<GardenPlantDetail, FocusSessionServiceError> {
+        let now = self.now()?;
+        let mut connection = self.database.open_connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(PersistenceError::Transaction)?;
+        let mut session = self.repository.find_by_id(&transaction, id)?;
+        if session.status == SessionStatus::Completed {
+            let detail = read_garden_plant(&transaction, id)?
+                .ok_or(FocusSessionServiceError::DataSafetyBlocker)?;
+            transaction
+                .commit()
+                .map_err(PersistenceError::Transaction)?;
+            return Ok(detail);
+        }
+        if session.status != SessionStatus::Active {
+            return Err(FocusSessionServiceError::Domain(
+                SessionError::InvalidTransition,
+            ));
+        }
+        let bundle = bundle_from_session(&session)?;
+        session.complete(now)?;
+        self.repository.update(&transaction, &session)?;
+        transaction.execute(
+            "INSERT INTO plants (id, source_session_id, plant_seed, generator_version, plant_genome_json, planted_at) VALUES (?1, ?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![session.id, bundle.seed, bundle.generator_version, bundle.genome_json, session.completed_at],
+        ).map_err(PersistenceError::DatabaseOperation)?;
+        let detail = read_garden_plant(&transaction, id)?
+            .ok_or(FocusSessionServiceError::DataSafetyBlocker)?;
+        transaction
+            .commit()
+            .map_err(PersistenceError::Transaction)?;
+        Ok(detail)
+    }
+
+    pub fn list_garden_plants(&self) -> Result<Vec<GardenPlantSummary>, FocusSessionServiceError> {
+        let connection = self.database.open_connection()?;
+        let mut statement = connection
+            .prepare("SELECT id FROM plants ORDER BY planted_at DESC, id DESC")
+            .map_err(PersistenceError::DatabaseOperation)?;
+        let ids = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(PersistenceError::DatabaseOperation)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(PersistenceError::DatabaseOperation)?;
+        drop(statement);
+        ids.into_iter()
+            .map(|id| {
+                let detail = read_garden_plant(&connection, &id)?
+                    .ok_or(FocusSessionServiceError::DataSafetyBlocker)?;
+                Ok(GardenPlantSummary {
+                    id: detail.id,
+                    planted_at: detail.planted_at,
+                    generator_version: detail.generator_version,
+                    plant_genome: detail.plant_genome,
+                })
+            })
+            .collect()
+    }
+
+    pub fn get_garden_plant(
+        &self,
+        id: &str,
+    ) -> Result<GardenPlantDetail, FocusSessionServiceError> {
+        let connection = self.database.open_connection()?;
+        read_garden_plant(&connection, id)?.ok_or(FocusSessionServiceError::PlantNotFound)
     }
 
     fn change<F>(
@@ -263,6 +369,43 @@ impl FocusSessionService {
     }
 }
 
+fn bundle_from_session(
+    session: &FocusSession,
+) -> Result<crate::domain::plant_bundle::PlantBundle, FocusSessionServiceError> {
+    match (
+        &session.plant_seed,
+        session.generator_version,
+        &session.plant_genome_json,
+    ) {
+        (Some(seed), Some(version), Some(json)) => validate_bundle(seed, version, json)
+            .map_err(|_| FocusSessionServiceError::DataSafetyBlocker),
+        _ => Err(FocusSessionServiceError::DataSafetyBlocker),
+    }
+}
+
+fn read_garden_plant(
+    connection: &rusqlite::Connection,
+    id: &str,
+) -> Result<Option<GardenPlantDetail>, FocusSessionServiceError> {
+    let detail = connection.query_row(
+        "SELECT p.id, p.planted_at, p.plant_seed, p.generator_version, p.plant_genome_json,
+                s.id, s.planned_duration_ms, s.started_at, s.target_end_at, s.completed_at, s.total_paused_ms, s.pause_count,
+                s.status, s.plant_seed, s.generator_version, s.plant_genome_json
+         FROM plants p JOIN sessions s ON s.id = p.source_session_id WHERE p.id = ?1", [id], |row| {
+            let genome_json: String = row.get(4)?;
+            let genome: PlantGenome = serde_json::from_str(&genome_json).map_err(|error| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(error)))?;
+            let status: String = row.get(12)?; let completed: Option<i64> = row.get(9)?;
+            let seed: String = row.get(2)?; let version: i64 = row.get(3)?;
+            let session_seed: Option<String> = row.get(13)?; let session_version: Option<i64> = row.get(14)?; let session_json: Option<String> = row.get(15)?;
+            if status != "COMPLETED" || completed != Some(row.get(1)?) || session_seed.as_deref() != Some(seed.as_str()) || session_version != Some(version) || session_json.as_deref() != Some(genome_json.as_str()) || validate_bundle(&seed, version, &genome_json).is_err() { return Err(rusqlite::Error::InvalidQuery); }
+            Ok(GardenPlantDetail { id: row.get(0)?, planted_at: row.get(1)?, plant_seed: seed, generator_version: version, plant_genome: genome, source_session: GardenSourceSession { id: row.get(5)?, planned_duration_ms: row.get(6)?, started_at: row.get(7)?, target_end_at: row.get(8)?, completed_at: completed.expect("checked"), total_paused_ms: row.get(10)?, pause_count: row.get(11)? } })
+        }).optional().map_err(|error| match error {
+            rusqlite::Error::InvalidQuery | rusqlite::Error::FromSqlConversionFailure(..) => FocusSessionServiceError::DataSafetyBlocker,
+            other => FocusSessionServiceError::Persistence(PersistenceError::DatabaseOperation(other)),
+        })?;
+    Ok(detail)
+}
+
 #[derive(Debug, Error)]
 pub enum FocusSessionServiceError {
     #[error(transparent)]
@@ -275,6 +418,10 @@ pub enum FocusSessionServiceError {
     TimeValueInvalid,
     #[error("the persisted plant-generation bundle is invalid")]
     GenerationDataInvalid,
+    #[error("persisted transactional data cannot be safely reconciled")]
+    DataSafetyBlocker,
+    #[error("the garden plant was not found")]
+    PlantNotFound,
 }
 
 #[derive(Debug)]
@@ -465,7 +612,7 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(plants, 0);
+        assert_eq!(plants, 1);
     }
 
     #[test]
@@ -571,5 +718,54 @@ mod tests {
         restarted.recover_active_sessions_on_launch().unwrap();
         let recovery = restarted.get_current().unwrap().unwrap();
         assert_eq!(recovery.plant_genome, preview);
+    }
+
+    #[test]
+    fn finalization_is_atomic_idempotent_and_creates_one_exact_plant() {
+        let (_directory, clock, service, database) = service(1_000_000);
+        let started = service.start(60_000).unwrap();
+        assert!(matches!(
+            service.finalize_focus_session(&started.id),
+            Err(FocusSessionServiceError::Domain(
+                SessionError::NotReadyToComplete
+            ))
+        ));
+        clock.set(1_060_000);
+        let first = service.finalize_focus_session(&started.id).unwrap();
+        let second = service.finalize_focus_session(&started.id).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.plant_seed, started.plant_seed);
+        let connection = database.open_connection().unwrap();
+        let counts: (i64, i64) = connection.query_row("SELECT (SELECT COUNT(*) FROM sessions WHERE status = 'COMPLETED'), (SELECT COUNT(*) FROM plants)", [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+        assert_eq!(counts, (1, 1));
+        drop(connection);
+        let restarted = FocusSessionService::with_clock(database, clock);
+        let listed = restarted.list_garden_plants().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, first.id);
+        assert_eq!(listed[0].plant_genome, first.plant_genome);
+        assert_eq!(restarted.get_garden_plant(&first.id).unwrap(), first);
+    }
+
+    #[test]
+    fn insert_failure_rolls_back_completion() {
+        let (_directory, clock, service, database) = service(1_000_000);
+        let started = service.start(60_000).unwrap();
+        clock.set(1_060_000);
+        let connection = database.open_connection().unwrap();
+        connection.execute_batch("CREATE TRIGGER fail_plant BEFORE INSERT ON plants BEGIN SELECT RAISE(ABORT, 'injected'); END;").unwrap();
+        assert!(service.finalize_focus_session(&started.id).is_err());
+        let status: String = connection
+            .query_row(
+                "SELECT status FROM sessions WHERE id = ?1",
+                [&started.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM plants", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(status, "ACTIVE");
+        assert_eq!(count, 0);
     }
 }

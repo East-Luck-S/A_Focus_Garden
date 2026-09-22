@@ -72,6 +72,12 @@ Focus-session preview identity is persisted at start, not recreated in React or 
 
 Growth derives from persisted timer truth and an observed wall clock. Browser intervals refresh the display only. A zero remaining value renders fully grown but does not transition a session, create a plant, or issue a reward. Those atomic completion responsibilities remain exclusively in M6.
 
+## ADR-016: Completion creates an immutable transactional plant receipt
+
+**Status:** Accepted and implemented for M6
+
+An elapsed timer is not a reward signal. The only completion use case uses one immediate SQLite transaction: validate the persisted generation bundle, complete the active session, insert the exact plant receipt, read the joined result, and commit. SQLite triggers make receipts and their source completion fields immutable. Historical data that cannot satisfy the exact one-plant relationship is blocked rather than regenerated or repaired.
+
 ## ADR-005: Just-in-time dependencies
 
 **Status:** Accepted for M0

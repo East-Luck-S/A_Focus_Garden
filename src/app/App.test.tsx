@@ -5,6 +5,8 @@ import {
   getCurrentFocusSession,
   getPersistenceStatus,
   abandonFocusSession,
+  finalizeFocusSession,
+  listGardenPlants,
   pauseFocusSession,
   resolveFocusSessionRecovery,
   startFocusSession,
@@ -18,6 +20,7 @@ vi.mock("../shared/native", () => ({
   getPersistenceStatus: vi.fn(), getCurrentFocusSession: vi.fn(), startFocusSession: vi.fn(),
   pauseFocusSession: vi.fn(), resumeFocusSession: vi.fn(), abandonFocusSession: vi.fn(),
   resolveFocusSessionRecovery: vi.fn(),
+  listGardenPlants: vi.fn(), getGardenPlant: vi.fn(), finalizeFocusSession: vi.fn(),
 }));
 
 const session = (status: FocusSessionSnapshot["status"] = "ACTIVE"): FocusSessionSnapshot => ({
@@ -38,8 +41,9 @@ describe("App", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
-    vi.mocked(getPersistenceStatus).mockResolvedValue({ initialized: true, schemaVersion: 3, databaseFileName: "focus-garden.sqlite3" });
+    vi.mocked(getPersistenceStatus).mockResolvedValue({ initialized: true, schemaVersion: 4, databaseFileName: "focus-garden.sqlite3" });
     vi.mocked(getCurrentFocusSession).mockResolvedValue(null);
+    vi.mocked(listGardenPlants).mockResolvedValue([]);
     vi.mocked(startFocusSession).mockResolvedValue(session());
   });
   afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -91,5 +95,20 @@ describe("App", () => {
     await act(async () => { await Promise.resolve(); });
     expect(resolveFocusSessionRecovery).toHaveBeenCalledWith("session-id", "ABANDON");
     expect(screen.getByRole("button", { name: "10 min" })).toBeInTheDocument();
+  });
+
+  it("shows an explicit finish action at zero and invokes it only once while pending", async () => {
+    const finished = { ...session(), targetEndAt: 1_000, remainingMs: 0 };
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(finished);
+    vi.mocked(finalizeFocusSession).mockResolvedValue({ id: "session-id", plantedAt: 1_000, plantSeed: "ffffffffffffffff", generatorVersion: 1, plantGenome: finished.plantGenome, sourceSession: { id: "session-id", plannedDurationMs: 60_000, startedAt: 1_000, targetEndAt: 1_000, completedAt: 1_000, totalPausedMs: 0, pauseCount: 0 } });
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const finish = screen.getByRole("button", { name: "Finish & plant" });
+    expect(finalizeFocusSession).not.toHaveBeenCalled();
+    fireEvent.click(finish); fireEvent.click(finish);
+    await act(async () => { await Promise.resolve(); });
+    expect(finalizeFocusSession).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Garden")).toBeInTheDocument();
+    expect(screen.getByText("Source session: session-id")).toBeInTheDocument();
   });
 });

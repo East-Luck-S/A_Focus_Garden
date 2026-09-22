@@ -1,6 +1,6 @@
 # Data Model
 
-This document records the persistence model through M5. Business-domain tables begin with the immutable M2 `sessions` schema and its append-only migrations.
+This document records the persistence model through M6. Business-domain tables begin with the immutable M2 `sessions` schema and its append-only migrations.
 
 ## `schema_migrations`
 
@@ -48,6 +48,19 @@ Created by immutable `002_focus_sessions`. It is the canonical focus-session rec
 | `plant_genome_json` | `TEXT NULL` | Exact serde JSON for the authoritative `PlantGenome`. |
 
 SQLite insert/update triggers require this bundle to be all-null or all-present. Rust additionally validates seed syntax, supported version, and that the genome JSON deserializes with the same generator version. `ACTIVE`, `PAUSED`, and `RECOVERY_REQUIRED` records exposed by M5 always have a full valid bundle: M2-era all-null open records are atomically backfilled on startup. Historical `ABANDONED` records may remain all-null. No `plants` table exists in M5.
+
+## `plants` (M6 / migration 004)
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | `TEXT PRIMARY KEY` | Immutable plant identifier (currently the source session ID). |
+| `source_session_id` | `TEXT UNIQUE NOT NULL FK` | The sole completed session that created this plant. |
+| `plant_seed` / `generator_version` / `plant_genome_json` | `NOT NULL` | Exact validated copy of the session generation bundle. |
+| `planted_at` | `INTEGER NOT NULL` | Exact copy of `sessions.completed_at`. |
+
+Migration 004 and startup auditing require every `COMPLETED` session to have exactly one matching plant and every other session to have none. Foreign keys, exact-match insertion triggers, and immutable plant/session triggers enforce the relationship. The application never repairs a missing or mismatched receipt; it returns `DATA_SAFETY_BLOCKER`.
+
+M6 native acceptance also independently verified the resulting production journal read-only: history `[1,2,3,4]`, one completed session and one plant, no open session, one exact joined invariant, an empty foreign-key check, and `integrity_check = ok`.
 
 ## M3 deterministic plant genome (domain value)
 

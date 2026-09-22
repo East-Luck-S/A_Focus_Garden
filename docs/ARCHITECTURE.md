@@ -34,7 +34,9 @@ The M1 `Database` abstraction owns only a database `PathBuf`. Operations use sho
 
 At application setup, Rust resolves Tauri's application-local data directory, creates it if necessary, opens `focus-garden.sqlite3`, applies migrations, and registers the persistence service. Startup failures surface as stable command error codes and never trigger database deletion, reset, or recreation.
 
-Only explicit Tauri commands are registered. M5 exposes persistence status plus current/start/pause/resume/abandon/recovery-resolution focus-session operations; it deliberately does not expose a completion command before M6 finalization exists. No generic query, execute-SQL, or database command exists. Commands delegate to application services, and errors are serialized as stable `{ code, message }` values rather than raw SQLite details or user paths.
+Only explicit Tauri commands are registered. M6 adds `finalize_focus_session`, `list_garden_plants`, and `get_garden_plant`; no generic query or execute-SQL command exists. `finalize_focus_session` alone transitions an eligible active session and inserts its exact immutable plant in one `BEGIN IMMEDIATE` transaction. A completed retry only reads and verifies its matching plant, and missing/mismatched transactional data is a `DATA_SAFETY_BLOCKER`, never an auto-repair.
+
+The M6 native acceptance exercised this boundary through the release executable: start a legal one-minute session, fully exit, restart after the target time, explicitly continue recovery, finalize, then fully exit and restart into the same persisted Garden plant. A read-only SQLite post-check confirmed migration history, exact session/plant identity, foreign keys, and integrity. This is runtime evidence, not an alternate application path.
 
 ## Schema evolution and timestamps
 

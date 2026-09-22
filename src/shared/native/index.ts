@@ -1,3 +1,3 @@
 export { getPersistenceStatus } from "./persistence";
-export { abandonFocusSession, getCurrentFocusSession, pauseFocusSession, resolveFocusSessionRecovery, resumeFocusSession, startFocusSession } from "./focus-session";
-export type { FocusSessionSnapshot, NativeError, PersistenceStatus, RecoveryResolution, SessionStatus } from "./types";
+export { abandonFocusSession, finalizeFocusSession, getCurrentFocusSession, getGardenPlant, listGardenPlants, pauseFocusSession, resolveFocusSessionRecovery, resumeFocusSession, startFocusSession } from "./focus-session";
+export type { FocusSessionSnapshot, GardenPlantDetail, GardenPlantSummary, NativeError, PersistenceStatus, RecoveryResolution, SessionStatus } from "./types";

@@ -32,6 +32,8 @@ pub enum PersistenceError {
     },
     #[error("migration history is not a continuous prefix starting at version 1")]
     MigrationHistoryInvalid,
+    #[error("persisted transactional data cannot be safely reconciled")]
+    DataSafetyBlocker,
     #[error("system clock is unavailable")]
     Clock(#[source] SystemTimeError),
 }

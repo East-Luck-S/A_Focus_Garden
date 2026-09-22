@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use rusqlite::{Connection, Transaction};
 
-use super::{run_migrations, PersistenceError};
+use super::{audit_transactional_data, run_migrations, PersistenceError};
 
 /// A lightweight database boundary. Each use opens a configured short-lived connection.
 #[derive(Debug, Clone)]
@@ -18,6 +18,7 @@ impl Database {
     pub fn initialize(&self) -> Result<(), PersistenceError> {
         let mut connection = self.open_connection()?;
         run_migrations(&mut connection)?;
+        audit_transactional_data(&connection)?;
         Ok(())
     }
 

@@ -8,6 +8,9 @@ use super::{
     Database, PersistenceError, CURRENT_SCHEMA_VERSION,
 };
 use crate::application::focus_session_service::{test_support::FakeClock, FocusSessionService};
+use crate::domain::plant_generator::{
+    generate_plant, resolve_seed, PlantGenerationInput, PLANT_GENERATOR_VERSION,
+};
 
 fn test_database() -> (tempfile::TempDir, Database) {
     let directory = tempdir().expect("test temporary directory should be created");
@@ -86,7 +89,7 @@ fn migrations_are_idempotent() {
         )
         .expect("table list should be readable");
 
-    assert_eq!(migration_count, 3);
+    assert_eq!(migration_count, 4);
     assert_eq!(table_count, 1);
 }
 
@@ -104,7 +107,7 @@ fn generation_bundle_triggers_reject_partial_rows() {
 }
 
 #[test]
-fn actual_v2_database_upgrades_to_v3_without_losing_a_session_then_hydrates_on_launch() {
+fn actual_v2_database_upgrades_to_v4_without_losing_a_session_then_hydrates_on_launch() {
     let directory = tempdir().expect("test temporary directory should be created");
     let database = Database::new(directory.path().join("v2-upgrade.sqlite3"));
     let mut connection = database.open_connection().expect("database should open");
@@ -123,7 +126,7 @@ fn actual_v2_database_upgrades_to_v3_without_losing_a_session_then_hydrates_on_l
 
     database
         .initialize()
-        .expect("formal v3 migration should succeed");
+        .expect("formal v4 migration should succeed");
     let connection = database
         .open_connection()
         .expect("upgraded database should open");
@@ -134,7 +137,7 @@ fn actual_v2_database_upgrades_to_v3_without_losing_a_session_then_hydrates_on_l
         .unwrap()
         .collect::<Result<Vec<i64>, _>>()
         .unwrap();
-    assert_eq!(versions, vec![1, 2, 3]);
+    assert_eq!(versions, vec![1, 2, 3, 4]);
     let preserved: (String, i64, i64, i64, String, Option<String>, Option<i64>, Option<String>) = connection.query_row(
         "SELECT id, planned_duration_ms, started_at, target_end_at, status, plant_seed, generator_version, plant_genome_json FROM sessions WHERE id = 'v2-active'",
         [],
@@ -167,6 +170,137 @@ fn actual_v2_database_upgrades_to_v3_without_losing_a_session_then_hydrates_on_l
     assert_eq!(hydrated.status.as_db(), "RECOVERY_REQUIRED");
     assert_eq!(hydrated.plant_seed.len(), 16);
     assert_eq!(hydrated.generator_version, 1);
+}
+
+#[test]
+fn completed_v3_session_without_a_bundle_blocks_004_without_recording_it() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().unwrap();
+    let migrations = registered_migrations_for_tests();
+    run_migrations_with(&mut connection, &migrations[..3], 3).unwrap();
+    connection.execute(
+        "INSERT INTO sessions (id, planned_duration_ms, started_at, target_end_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at)
+         VALUES ('unsafe-completed', 60000, 0, 60000, 0, 60000, 'COMPLETED', 0, 0, 60000)",
+        [],
+    ).unwrap();
+    drop(connection);
+
+    assert!(matches!(
+        database.initialize(),
+        Err(PersistenceError::DataSafetyBlocker)
+    ));
+    let connection = database.open_connection().unwrap();
+    let versions: Vec<i64> = connection
+        .prepare("SELECT version FROM schema_migrations ORDER BY version")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(versions, vec![1, 2, 3]);
+    let plants_exists: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'plants'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(plants_exists, 0);
+}
+
+#[test]
+fn valid_historical_completed_v3_session_reconciles_to_one_exact_plant() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().unwrap();
+    let migrations = registered_migrations_for_tests();
+    run_migrations_with(&mut connection, &migrations[..3], 3).unwrap();
+    let (seed, version, genome) = valid_bundle("historical", 60_000, 1_000);
+    connection.execute(
+        "INSERT INTO sessions (id, planned_duration_ms, started_at, target_end_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at, plant_seed, generator_version, plant_genome_json)
+         VALUES ('historical', 60000, 1000, 61000, 0, 61000, 'COMPLETED', 0, 1000, 61000, ?1, ?2, ?3)",
+        params![seed, version, genome],
+    ).unwrap();
+    drop(connection);
+
+    database.initialize().unwrap();
+    let connection = database.open_connection().unwrap();
+    let copied: (String, i64, String, i64) = connection.query_row(
+        "SELECT plant_seed, generator_version, plant_genome_json, planted_at FROM plants WHERE source_session_id = 'historical'", [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    ).unwrap();
+    let (expected_seed, expected_version, expected_genome) =
+        valid_bundle("historical", 60_000, 1_000);
+    assert_eq!(copied.0, expected_seed);
+    assert_eq!(copied.1, expected_version);
+    assert_eq!(copied.2, expected_genome);
+    assert_eq!(copied.3, 61_000);
+}
+
+#[test]
+fn partial_completed_v3_bundle_blocks_004_without_recording_it() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().unwrap();
+    let migrations = registered_migrations_for_tests();
+    run_migrations_with(&mut connection, &migrations[..3], 3).unwrap();
+    connection.execute_batch("DROP TRIGGER sessions_generation_bundle_insert; DROP TRIGGER sessions_generation_bundle_update;").unwrap();
+    connection.execute(
+        "INSERT INTO sessions (id, planned_duration_ms, started_at, target_end_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at, plant_seed)
+         VALUES ('partial-completed', 60000, 0, 60000, 0, 60000, 'COMPLETED', 0, 0, 60000, '0000000000000000')", [],
+    ).unwrap();
+    drop(connection);
+
+    assert!(matches!(
+        database.initialize(),
+        Err(PersistenceError::DataSafetyBlocker)
+    ));
+    assert_v3_and_no_plants(&database);
+}
+
+#[test]
+fn completed_v4_session_without_plant_blocks_startup_audit_without_repair() {
+    let (_directory, database) = test_database();
+    database.initialize().unwrap();
+    let clock = Arc::new(FakeClock::new(1_000));
+    let service = FocusSessionService::with_clock(database.clone(), clock.clone());
+    let session = service.start(60_000).unwrap();
+    clock.set(61_000);
+    service.finalize_focus_session(&session.id).unwrap();
+    let connection = database.open_connection().unwrap();
+    connection
+        .execute_batch("DROP TRIGGER plants_are_immutable_delete;")
+        .unwrap();
+    connection
+        .execute(
+            "DELETE FROM plants WHERE source_session_id = ?1",
+            [&session.id],
+        )
+        .unwrap();
+    drop(connection);
+
+    assert!(matches!(
+        database.initialize(),
+        Err(PersistenceError::DataSafetyBlocker)
+    ));
+    let connection = database.open_connection().unwrap();
+    let plants: i64 = connection
+        .query_row("SELECT COUNT(*) FROM plants", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(plants, 0);
+}
+
+#[test]
+fn abandoned_session_never_creates_a_plant() {
+    let (_directory, database) = test_database();
+    database.initialize().unwrap();
+    let clock = Arc::new(FakeClock::new(1_000));
+    let service = FocusSessionService::with_clock(database.clone(), clock);
+    let session = service.start(60_000).unwrap();
+    service.abandon(&session.id).unwrap();
+    let connection = database.open_connection().unwrap();
+    let plants: i64 = connection
+        .query_row("SELECT COUNT(*) FROM plants", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(plants, 0);
 }
 
 #[test]
@@ -439,4 +573,38 @@ fn table_exists(connection: &rusqlite::Connection, table_name: &str) -> bool {
             |row| row.get(0),
         )
         .expect("table lookup should succeed")
+}
+
+fn valid_bundle(id: &str, duration: i64, started_at: i64) -> (String, i64, String) {
+    let input = PlantGenerationInput {
+        session_id: id.into(),
+        planned_duration_ms: duration,
+        started_at,
+        generator_version: PLANT_GENERATOR_VERSION,
+    };
+    let seed = resolve_seed(&input).unwrap();
+    let genome = generate_plant(seed, PLANT_GENERATOR_VERSION).unwrap();
+    (
+        format!("{seed:016x}"),
+        i64::from(PLANT_GENERATOR_VERSION),
+        serde_json::to_string(&genome).unwrap(),
+    )
+}
+
+fn assert_v3_and_no_plants(database: &Database) {
+    let connection = database.open_connection().unwrap();
+    let version: i64 = connection
+        .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    let plants: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'plants'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(version, 3);
+    assert_eq!(plants, 0);
 }

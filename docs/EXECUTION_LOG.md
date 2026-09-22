@@ -1,5 +1,14 @@
 # Execution Log
 
+## M6 — MVP Transactional Vertical Slice — CLOSED
+
+- Added schema version 4, `004_transactional_plants`, append-only `plants`, exact source/session triggers, immutable receipts, v3 preflight, and post-migration startup reconciliation.
+- Added one immediate transactional finalizer, idempotent exact completed reads, typed Garden list/detail commands, and a minimal Focus/Garden UI with explicit `Finish & plant` action.
+- Added tests for valid and invalid v3 historical reconciliation, v4 missing-plant startup blocking, abandoned zero-plant behavior, atomic rollback injection, idempotence, restart list/detail, and native wrapper/UI pending behavior.
+- Native release evidence: session `1d35b42c-8344-4df0-a0d2-e78402a25842` started with a full bundle and no plant; after full process exit and an elapsed target it restarted as `RECOVERY_REQUIRED` with no plant; explicit Continue followed by `Finish & plant` yielded one completed session and plant with matching ID/source and timestamp `1790053533747`. A third fresh launch still rendered the Garden plant. Read-only database validation confirmed `[1,2,3,4]`, completed=1, open=0, plants=1, exact joined invariant=1, no foreign-key rows, and `integrity_check=ok`; no process remained.
+- Release package evidence: `focus-garden.exe` 5,890,048 bytes, SHA-256 `72E0F59FA08906E58DE559ED332B11CE96BB78EA766467769D64C5AC3CEF7FE9`; one NSIS installer `Focus Garden_0.1.0_x64-setup.exe` 2,140,985 bytes, SHA-256 `8BE79E7752F16C3DA370AABECC545E67E736091952607BC5B8809E45198432FB`.
+- All M6 gates passed. Epoch A is complete; M7 has not started.
+
 ## M5 — Focus Flow & Real-time Growth
 
 - Added schema version 3, `003_session_plant_preview`, with nullable `plant_seed`, `generator_version`, and `plant_genome_json` columns plus SQLite all-null/all-present enforcement triggers.
