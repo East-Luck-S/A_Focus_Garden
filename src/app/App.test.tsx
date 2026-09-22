@@ -1,14 +1,36 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { getPersistenceStatus } from "../shared/native";
 
 import { App } from "./App";
 
+vi.mock("../shared/native", () => ({
+  getPersistenceStatus: vi.fn(),
+}));
+
 describe("App", () => {
   it("renders the Focus Garden title", () => {
+    vi.mocked(getPersistenceStatus).mockResolvedValue({
+      initialized: true,
+      schemaVersion: 1,
+      databaseFileName: "focus-garden.sqlite3",
+    });
     render(<App />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Focus Garden" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows the initialized persistence version", async () => {
+    vi.mocked(getPersistenceStatus).mockResolvedValue({
+      initialized: true,
+      schemaVersion: 1,
+      databaseFileName: "focus-garden.sqlite3",
+    });
+    render(<App />);
+
+    expect(await screen.findByText("Persistence ready · Schema v1")).toBeInTheDocument();
   });
 });

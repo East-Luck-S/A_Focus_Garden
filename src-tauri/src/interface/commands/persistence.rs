@@ -1,0 +1,72 @@
+use serde::Serialize;
+use tauri::State;
+
+use crate::{
+    application::persistence_service::{PersistenceService, PersistenceStatus},
+    infrastructure::persistence::{AppError, PersistenceError},
+};
+
+#[derive(Debug, Serialize)]
+pub struct NativeError {
+    pub code: &'static str,
+    pub message: &'static str,
+}
+
+impl From<AppError> for NativeError {
+    fn from(error: AppError) -> Self {
+        match error {
+            AppError::AppDataDirectory => Self {
+                code: "APP_DATA_DIRECTORY_UNAVAILABLE",
+                message: "The application data directory is unavailable.",
+            },
+            AppError::NativeRuntime => Self {
+                code: "NATIVE_RUNTIME_FAILURE",
+                message: "The native application runtime is unavailable.",
+            },
+            AppError::Persistence(error) => Self::from(error),
+        }
+    }
+}
+
+impl From<PersistenceError> for NativeError {
+    fn from(error: PersistenceError) -> Self {
+        let (code, message) = match error {
+            PersistenceError::Directory(_) => (
+                "PERSISTENCE_DIRECTORY_FAILURE",
+                "The persistence directory could not be prepared.",
+            ),
+            PersistenceError::DatabaseOpen(_) => (
+                "DATABASE_OPEN_FAILURE",
+                "The local database could not be opened.",
+            ),
+            PersistenceError::DatabaseOperation(_) => (
+                "DATABASE_OPERATION_FAILURE",
+                "A local database operation failed.",
+            ),
+            PersistenceError::Transaction(_) => (
+                "TRANSACTION_FAILURE",
+                "A local database transaction failed.",
+            ),
+            PersistenceError::Migration(_) => (
+                "MIGRATION_FAILED",
+                "The local database migration could not be completed.",
+            ),
+            PersistenceError::UnsupportedFutureSchema { .. } => (
+                "UNSUPPORTED_FUTURE_SCHEMA",
+                "This database was created by a newer version of Focus Garden.",
+            ),
+            PersistenceError::Clock(_) => (
+                "CLOCK_UNAVAILABLE",
+                "The system clock is unavailable for persistence initialization.",
+            ),
+        };
+        Self { code, message }
+    }
+}
+
+#[tauri::command]
+pub fn get_persistence_status(
+    service: State<'_, PersistenceService>,
+) -> Result<PersistenceStatus, NativeError> {
+    service.get_persistence_status().map_err(NativeError::from)
+}

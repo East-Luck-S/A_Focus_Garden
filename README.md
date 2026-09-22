@@ -2,7 +2,7 @@
 
 Focus Garden is a Windows-only focus application planned around a simple loop: a focus session drives real-time growth, produces a deterministic plant, and adds it to a persistent garden.
 
-The project is currently at **M0: Repository Foundation & Windows Native Baseline**. This milestone provides only a runnable foundation app; it does not implement the timer, plant generation, persistence, or garden features.
+The project is currently at **M1: Persistence & Native Boundary Foundation**. It establishes local SQLite initialization, versioned migrations, and one typed native status command. It does not implement the timer, plant generation, sessions, or garden features.
 
 ## Technology baseline
 
@@ -12,6 +12,7 @@ The project is currently at **M0: Repository Foundation & Windows Native Baselin
 - Vitest and React Testing Library for frontend tests
 - Cargo formatting, Clippy, and Rust tests for the native layer
 - npm for JavaScript dependency management
+- `rusqlite` with bundled SQLite for local persistence; users do not need to install SQLite separately
 
 The formal runtime has no AI API, cloud backend, account, cloud sync, social, payment, ads, or telemetry.
 
@@ -74,6 +75,12 @@ cargo test
 cargo clippy -- -D warnings
 ```
 
+## Persistence foundation
+
+Rust exclusively owns SQLite. React uses a typed native wrapper for the explicit `get_persistence_status` command and has no SQL or database-path access. On native startup, Tauri resolves the application's local data directory, safely creates it when needed, and initializes `focus-garden.sqlite3` there. The precise user-specific directory is intentionally not part of the frontend API or this documentation.
+
+The database starts with two production tables only: migration tracking (`schema_migrations`) and application metadata (`app_metadata`). Schema changes are applied as atomic, versioned migrations. The M1 Rust tests cover empty-database initialization, idempotency, future-schema rejection, atomic migration failure, foreign keys, transaction commit/rollback, and metadata constraints.
+
 ## Windows native build
 
 Build the release executable and NSIS installer:
@@ -90,3 +97,4 @@ Generated frontend output, Rust targets, and native bundles are intentionally ex
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Decisions](docs/DECISIONS.md)
+- [Data model](docs/DATA_MODEL.md)

@@ -18,11 +18,29 @@ Tauri 2 and Rust provide the native application boundary. Vite, React, and stric
 
 Future session, plant, persistence, transaction, migration, backup, and Windows-integration behavior belongs behind the Rust application/domain boundary. React owns presentation, interaction, projections, SVG rendering, and transient UI state.
 
-## ADR-004: SQLite will be the future canonical persistent source of truth
+## ADR-004: SQLite is the canonical persistent source of truth
 
-**Status:** Accepted as an architectural boundary; implementation deferred to M1+
+**Status:** Accepted and implemented for M1
 
-React will not access SQLite directly. Browser storage and frontend state persistence are not substitutes for canonical business persistence. No database dependency or schema is added in M0.
+SQLite access exists only in Rust through `rusqlite` with its bundled SQLite feature. React never receives generic SQL access; it calls specific typed Tauri command wrappers. Browser storage and frontend state persistence are not substitutes for canonical business persistence.
+
+## ADR-008: Versioned migrations begin with the first schema
+
+**Status:** Accepted and implemented for M1
+
+All schema evolution uses ordered, versioned migrations recorded in `schema_migrations`. Migration 001 creates only the infrastructure `app_metadata` table. Each migration is atomic, failures roll back, and databases newer than the application schema are rejected rather than downgraded or reset.
+
+## ADR-009: Persist timestamps as UTC Unix epoch milliseconds
+
+**Status:** Accepted and implemented for M1
+
+Persistence timestamps use UTC Unix epoch milliseconds. This is timezone-independent, sortable, compact, and consistent across migration tracking and future persistence records.
+
+## ADR-010: Keep SQLite default journal mode in M1
+
+**Status:** Accepted for M1
+
+M1 intentionally leaves SQLite's journal mode at its default. WAL is not needed for the single-user foundation workload and would require explicit backup/restore coordination for sidecar files. The connection policy enables foreign keys and a bounded busy timeout only.
 
 ## ADR-005: Just-in-time dependencies
 
