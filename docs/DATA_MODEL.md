@@ -42,3 +42,5 @@ Created by immutable `002_focus_sessions`. It is the canonical M2 focus-session 
 ## M3 deterministic plant genome (domain value)
 
 `PlantGenerationInput` is the stable generation-time value: `session_id`, `planned_duration_ms`, `started_at`, and `generator_version`. It resolves to a `u64` seed through a documented FNV-1a 64-bit byte contract (little-endian numeric fields and length-prefixed UTF-8 session ID). `generate_plant(seed, 1)` produces `PlantGenome` V1, containing morphology, stem, ordered leaves, flower, palette, and effects. Genomes contain only explicitly ordered structs, enums, vectors, and integers, so serialization does not depend on hash-map iteration or floating-point behavior. The seed is designed to be saveable when plant persistence is introduced.
+
+M4 adds a frontend-only TypeScript DTO mirror with the same serialized snake_case fields and a deterministic SVG projection. The renderer accepts a separately supplied clamped growth value and does not persist, mutate, generate, or otherwise make a genome authoritative.

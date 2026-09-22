@@ -1,5 +1,12 @@
 # Execution Log
 
+## M4 — SVG Plant Renderer V1
+
+- Added a TypeScript mirror of the serialized Rust `PlantGenome` V1 contract; it remains presentation-only and does not alter the Rust generator or persistence schema.
+- `buildPlantScene(genome, growth)` is a deterministic, non-mutating SVG projection. It clamps supplied growth and derives seed, stem, leaves, branches, buds, flower, palette, and effects solely from the supplied genome.
+- `PlantSvg` is an accessible, reusable SVG component with no native, persistence, clock, or random dependency. M5 may supply live growth; M6 may reuse it at growth `1`.
+- Deferred: focus-flow wiring, session completion finalization, genome persistence, and garden presentation.
+
 ## M3 — Deterministic Plant Generator V1
 
 - Schema version remains 2; M3 adds no migration or persistent plant table.

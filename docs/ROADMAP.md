@@ -1,13 +1,13 @@
 # Roadmap
 
-M3 is closed within the authorized Epoch A sequence; M4 is now active.
+M4 is closed within the authorized Epoch A sequence; M5 is now active.
 
 1. **M0 — Repository Foundation & Windows Native Baseline**
 2. **M1 — Persistence & Native Boundary Foundation**
 3. **M2 — Focus Session Domain & Timer** — CLOSED
 4. **M3 — Deterministic Plant Generator V1** — CLOSED
-5. **M4 — SVG Plant Renderer V1** — ACTIVE
-6. **M5 — Focus Flow & Real-time Growth**
+5. **M4 — SVG Plant Renderer V1** — CLOSED
+6. **M5 — Focus Flow & Real-time Growth** — ACTIVE
 7. **M6 — MVP Transactional Vertical Slice**
 8. **M7 — Core Garden**
 9. **M8 — Stats / Tags / Collection Foundation**
