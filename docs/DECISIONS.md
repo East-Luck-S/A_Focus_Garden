@@ -60,6 +60,18 @@ An active session discovered on cold launch changes to `RECOVERY_REQUIRED`; it i
 
 Plant generation is a pure Rust-domain contract. V1 resolves a seed from validated stable input with documented FNV-1a 64-bit hashing and generates its genome with a fixed integer SplitMix64 PRNG. It neither reads a clock nor uses uncontrolled randomness. The public genome uses ordered structs, enums, vectors, and integer fields so serialized output remains stable. Generator versions are explicit and unsupported versions fail rather than silently changing a saved plant's meaning.
 
+## ADR-014: Persist immutable session preview bundles
+
+**Status:** Accepted and implemented for M5
+
+Focus-session preview identity is persisted at start, not recreated in React or recalculated during recovery. A transaction writes the session, hexadecimal `u64` seed, generator version, and exact serialized genome together. A complete stored bundle is deserialized and used unchanged; legacy all-null open sessions are deterministically backfilled once, while partial or invalid bundles are treated as integrity failures. This prevents generator upgrades, JavaScript integer precision, and restart paths from changing an in-progress plant.
+
+## ADR-015: Growth is a read projection, never a completion signal
+
+**Status:** Accepted and implemented for M5
+
+Growth derives from persisted timer truth and an observed wall clock. Browser intervals refresh the display only. A zero remaining value renders fully grown but does not transition a session, create a plant, or issue a reward. Those atomic completion responsibilities remain exclusively in M6.
+
 ## ADR-005: Just-in-time dependencies
 
 **Status:** Accepted for M0

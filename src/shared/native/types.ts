@@ -26,4 +26,8 @@ export type FocusSessionSnapshot = {
   updatedAt: number;
   remainingMs: number;
   observedAt: number;
+  /** 16-character lowercase hexadecimal u64; never a JavaScript number. */
+  plantSeed: string;
+  generatorVersion: number;
+  plantGenome: import("../plant").PlantGenome;
 };

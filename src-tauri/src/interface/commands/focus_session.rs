@@ -102,6 +102,10 @@ impl From<FocusSessionServiceError> for NativeError {
                 code: "SESSION_DATA_INVALID",
                 message: "The stored focus session data is invalid.",
             },
+            FocusSessionServiceError::GenerationDataInvalid => Self {
+                code: "SESSION_GENERATION_DATA_INVALID",
+                message: "The stored plant preview for this focus session is invalid.",
+            },
             FocusSessionServiceError::Domain(SessionError::TimeValueInvalid)
             | FocusSessionServiceError::TimeValueInvalid => Self {
                 code: "TIME_VALUE_INVALID",

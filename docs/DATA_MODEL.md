@@ -1,6 +1,6 @@
 # Data Model
 
-M1 establishes only persistence infrastructure. Business domain schema is **not implemented in M1**.
+This document records the persistence model through M5. Business-domain tables begin with the immutable M2 `sessions` schema and its append-only migrations.
 
 ## `schema_migrations`
 
@@ -24,7 +24,7 @@ Created by `001_persistence_foundation`. This table is reserved for stable appli
 
 ## `sessions`
 
-Created by immutable `002_focus_sessions`. It is the canonical M2 focus-session record; no plant or garden data is present yet.
+Created by immutable `002_focus_sessions`. It is the canonical focus-session record; M5 preview columns are appended separately by migration 003.
 
 | Column | Type | Meaning |
 | --- | --- | --- |
@@ -37,10 +37,20 @@ Created by immutable `002_focus_sessions`. It is the canonical M2 focus-session 
 | `pause_count` | `INTEGER` | Number of successful pauses. |
 | `created_at` / `updated_at` | `INTEGER` | UTC milliseconds for persistence auditing. |
 
-`sessions_single_open_session` is a partial unique index across non-terminal statuses, preventing more than one `ACTIVE`, `PAUSED`, or `RECOVERY_REQUIRED` session. M3 deliberately retains schema version 2: the deterministic V1 genome is a Rust-domain value only and is not persisted until a later authorized milestone. Future schema changes must append a new versioned migration; existing migration definitions are immutable.
+`sessions_single_open_session` is a partial unique index across non-terminal statuses, preventing more than one `ACTIVE`, `PAUSED`, or `RECOVERY_REQUIRED` session. Migration 003 adds the nullable generation bundle below without rewriting M2 session rows. Future schema changes must append a new versioned migration; existing migration definitions are immutable.
+
+## Session plant preview bundle (M5 / migration 003)
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `plant_seed` | `TEXT NULL` | A fixed-width, 16-character lowercase hexadecimal encoding of the Rust `u64` seed. It is intentionally not an SQLite integer or JavaScript number. |
+| `generator_version` | `INTEGER NULL` | The explicit generator version for the preview. |
+| `plant_genome_json` | `TEXT NULL` | Exact serde JSON for the authoritative `PlantGenome`. |
+
+SQLite insert/update triggers require this bundle to be all-null or all-present. Rust additionally validates seed syntax, supported version, and that the genome JSON deserializes with the same generator version. `ACTIVE`, `PAUSED`, and `RECOVERY_REQUIRED` records exposed by M5 always have a full valid bundle: M2-era all-null open records are atomically backfilled on startup. Historical `ABANDONED` records may remain all-null. No `plants` table exists in M5.
 
 ## M3 deterministic plant genome (domain value)
 
-`PlantGenerationInput` is the stable generation-time value: `session_id`, `planned_duration_ms`, `started_at`, and `generator_version`. It resolves to a `u64` seed through a documented FNV-1a 64-bit byte contract (little-endian numeric fields and length-prefixed UTF-8 session ID). `generate_plant(seed, 1)` produces `PlantGenome` V1, containing morphology, stem, ordered leaves, flower, palette, and effects. Genomes contain only explicitly ordered structs, enums, vectors, and integers, so serialization does not depend on hash-map iteration or floating-point behavior. The seed is designed to be saveable when plant persistence is introduced.
+`PlantGenerationInput` is the stable generation-time value: `session_id`, `planned_duration_ms`, `started_at`, and `generator_version`. It resolves to a `u64` seed through a documented FNV-1a 64-bit byte contract (little-endian numeric fields and length-prefixed UTF-8 session ID). `generate_plant(seed, 1)` produces `PlantGenome` V1, containing morphology, stem, ordered leaves, flower, palette, and effects. Genomes contain only explicitly ordered structs, enums, vectors, and integers, so serialization does not depend on hash-map iteration or floating-point behavior.
 
-M4 adds a frontend-only TypeScript DTO mirror with the same serialized snake_case fields and a deterministic SVG projection. The renderer accepts a separately supplied clamped growth value and does not persist, mutate, generate, or otherwise make a genome authoritative.
+M4 adds a frontend-only TypeScript DTO mirror with the same serialized snake_case fields and a deterministic SVG projection. M5 supplies a persisted native preview and a separately supplied clamped display-growth value. The renderer does not persist, mutate, generate, or otherwise make a genome authoritative.

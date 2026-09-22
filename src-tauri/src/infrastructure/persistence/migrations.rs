@@ -4,7 +4,7 @@ use rusqlite::{params, Connection, Transaction};
 
 use super::{MigrationError, PersistenceError};
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 2;
+pub const CURRENT_SCHEMA_VERSION: i64 = 3;
 
 #[derive(Clone, Copy)]
 pub(crate) struct Migration {
@@ -24,7 +24,17 @@ const MIGRATIONS: &[Migration] = &[
         name: "002_focus_sessions",
         apply: apply_focus_sessions,
     },
+    Migration {
+        version: 3,
+        name: "003_session_plant_preview",
+        apply: apply_session_plant_preview,
+    },
 ];
+
+#[cfg(test)]
+pub(crate) fn registered_migrations_for_tests() -> &'static [Migration] {
+    MIGRATIONS
+}
 
 pub fn run_migrations(connection: &mut Connection) -> Result<i64, PersistenceError> {
     run_migrations_with(connection, MIGRATIONS, CURRENT_SCHEMA_VERSION)
@@ -180,5 +190,29 @@ fn apply_focus_sessions(transaction: &Transaction<'_>) -> rusqlite::Result<()> {
             ON sessions ((1))
             WHERE status IN ('ACTIVE', 'PAUSED', 'RECOVERY_REQUIRED');
         CREATE INDEX sessions_status_created_at ON sessions (status, created_at DESC);",
+    )
+}
+
+fn apply_session_plant_preview(transaction: &Transaction<'_>) -> rusqlite::Result<()> {
+    // SQLite cannot add a table-level CHECK with ALTER TABLE. Keep the existing
+    // table and data intact, then enforce the nullable bundle through triggers.
+    transaction.execute_batch(
+        "ALTER TABLE sessions ADD COLUMN plant_seed TEXT;
+         ALTER TABLE sessions ADD COLUMN generator_version INTEGER;
+         ALTER TABLE sessions ADD COLUMN plant_genome_json TEXT;
+         CREATE TRIGGER sessions_generation_bundle_insert
+         BEFORE INSERT ON sessions
+         WHEN (NEW.plant_seed IS NULL OR NEW.generator_version IS NULL OR NEW.plant_genome_json IS NULL)
+          AND NOT (NEW.plant_seed IS NULL AND NEW.generator_version IS NULL AND NEW.plant_genome_json IS NULL)
+         BEGIN
+           SELECT RAISE(ABORT, 'session generation bundle must be all-null or all-present');
+         END;
+         CREATE TRIGGER sessions_generation_bundle_update
+         BEFORE UPDATE OF plant_seed, generator_version, plant_genome_json ON sessions
+         WHEN (NEW.plant_seed IS NULL OR NEW.generator_version IS NULL OR NEW.plant_genome_json IS NULL)
+          AND NOT (NEW.plant_seed IS NULL AND NEW.generator_version IS NULL AND NEW.plant_genome_json IS NULL)
+         BEGIN
+           SELECT RAISE(ABORT, 'session generation bundle must be all-null or all-present');
+         END;",
     )
 }

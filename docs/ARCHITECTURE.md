@@ -34,7 +34,7 @@ The M1 `Database` abstraction owns only a database `PathBuf`. Operations use sho
 
 At application setup, Rust resolves Tauri's application-local data directory, creates it if necessary, opens `focus-garden.sqlite3`, applies migrations, and registers the persistence service. Startup failures surface as stable command error codes and never trigger database deletion, reset, or recreation.
 
-Only explicit Tauri commands are registered. M2 exposes persistence status plus current/start/pause/resume/abandon/recovery-resolution focus-session operations; it deliberately does not expose a completion command before M6 finalization exists. No generic query, execute-SQL, or database command exists. Commands delegate to application services, and errors are serialized as stable `{ code, message }` values rather than raw SQLite details or user paths.
+Only explicit Tauri commands are registered. M5 exposes persistence status plus current/start/pause/resume/abandon/recovery-resolution focus-session operations; it deliberately does not expose a completion command before M6 finalization exists. No generic query, execute-SQL, or database command exists. Commands delegate to application services, and errors are serialized as stable `{ code, message }` values rather than raw SQLite details or user paths.
 
 ## Schema evolution and timestamps
 
@@ -49,6 +49,12 @@ The planned SVG renderer is a React/TypeScript projection of an authoritative pl
 The Rust domain owns the session state machine and timer. Timer truth is `started_at`, `planned_duration_ms`, `target_end_at`, `paused_at`, and `total_paused_ms`, all in UTC Unix epoch milliseconds. Active remaining time is `max(0, target_end_at - now)`; paused remaining time is `max(0, target_end_at - paused_at)`. Resume shifts `target_end_at` by the exact recorded pause duration. Browser intervals refresh only a React projection and never transition a session.
 
 Only one non-terminal session is allowed. Application writes begin in SQLite `BEGIN IMMEDIATE` transactions and the schema has a partial unique index over `ACTIVE`, `PAUSED`, and `RECOVERY_REQUIRED`, so the invariant is not UI-dependent. On launch, persisted `ACTIVE` sessions become `RECOVERY_REQUIRED`; they cannot auto-complete or create rewards. Explicit recovery `CONTINUE` preserves target end time and pause total, while `ABANDON` ends the session. Paused sessions survive launch as paused.
+
+## M5 preview identity and growth projection
+
+Every newly started session resolves its Rust V1 seed and genome inside the same `BEGIN IMMEDIATE` transaction that inserts the session. The database stores a generation bundle: a 16-character lowercase hexadecimal seed string, integer generator version, and exact serde genome JSON. The string representation is mandatory because JavaScript numbers cannot safely carry all `u64` values. Existing M2 open sessions with an all-null bundle are deterministically backfilled before launch recovery proceeds. A partial bundle, malformed seed, unsupported/mismatched version, or invalid genome JSON stops the operation with `SESSION_GENERATION_DATA_INVALID`; the application never silently regenerates, deletes, or repairs it. A complete persisted genome is deserialized and rendered as-is, even if a newer generator would now make a different result.
+
+Rust snapshots include the immutable preview and a remaining-time observation. React derives `growth = clamp(1 - remaining / plannedDuration)` only for display. For `ACTIVE`, remaining is `max(0, targetEndAt - now)` and an interval refreshes `now`; the interval never calls a state-changing command. For `PAUSED`, it is frozen at `pausedAt`; for `RECOVERY_REQUIRED`, it remains the native snapshot until an explicit resolution. At zero time the active session remains active and no reward or plant record is created—M6 owns completion finalization.
 
 ## Native command boundary
 

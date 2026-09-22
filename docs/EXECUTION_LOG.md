@@ -1,5 +1,13 @@
 # Execution Log
 
+## M5 — Focus Flow & Real-time Growth
+
+- Added schema version 3, `003_session_plant_preview`, with nullable `plant_seed`, `generator_version`, and `plant_genome_json` columns plus SQLite all-null/all-present enforcement triggers.
+- New starts atomically persist a Rust-generated V1 preview bundle; 64-bit seeds use fixed lowercase hexadecimal strings across SQLite, DTOs, and React.
+- Startup atomically backfills only all-null M2 open sessions before active-session recovery. Invalid or partial generation data returns `SESSION_GENERATION_DATA_INVALID` and is neither repaired nor regenerated. Complete persisted genomes are deserialized and retained exactly.
+- The Focus Screen now offers 10/25/45 minute starts, PlantSvg live growth, pause/resume/abandon, and explicit recovery continuation. React intervals update only a wall-clock display projection.
+- Deferred intact: M6 completion finalizer, reward/plant creation, plants table, final garden, installers, and all subsequent milestones.
+
 ## M4 — SVG Plant Renderer V1
 
 - Added a TypeScript mirror of the serialized Rust `PlantGenome` V1 contract; it remains presentation-only and does not alter the Rust generator or persistence schema.

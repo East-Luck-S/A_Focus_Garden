@@ -12,7 +12,7 @@ impl FocusSessionRepository {
         transaction: &Transaction<'_>,
         session: &FocusSession,
     ) -> Result<(), SessionRepositoryError> {
-        transaction.execute("INSERT INTO sessions (id, planned_duration_ms, started_at, target_end_at, paused_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)", params![session.id, session.planned_duration_ms, session.started_at, session.target_end_at, session.paused_at, session.total_paused_ms, session.completed_at, session.status.as_db(), session.pause_count, session.created_at, session.updated_at]).map_err(map_write_error)?;
+        transaction.execute("INSERT INTO sessions (id, planned_duration_ms, started_at, target_end_at, paused_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at, plant_seed, generator_version, plant_genome_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)", params![session.id, session.planned_duration_ms, session.started_at, session.target_end_at, session.paused_at, session.total_paused_ms, session.completed_at, session.status.as_db(), session.pause_count, session.created_at, session.updated_at, session.plant_seed, session.generator_version, session.plant_genome_json]).map_err(map_write_error)?;
         Ok(())
     }
 
@@ -21,14 +21,14 @@ impl FocusSessionRepository {
         transaction: &Transaction<'_>,
         id: &str,
     ) -> Result<FocusSession, SessionRepositoryError> {
-        transaction.query_row("SELECT id, planned_duration_ms, started_at, target_end_at, paused_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at FROM sessions WHERE id = ?1", [id], decode_session).optional().map_err(map_read_error)?.ok_or(SessionRepositoryError::NotFound)
+        transaction.query_row("SELECT id, planned_duration_ms, started_at, target_end_at, paused_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at, plant_seed, generator_version, plant_genome_json FROM sessions WHERE id = ?1", [id], decode_session).optional().map_err(map_read_error)?.ok_or(SessionRepositoryError::NotFound)
     }
 
     pub fn find_current(
         &self,
         transaction: &Transaction<'_>,
     ) -> Result<Option<FocusSession>, SessionRepositoryError> {
-        transaction.query_row("SELECT id, planned_duration_ms, started_at, target_end_at, paused_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at FROM sessions WHERE status IN ('ACTIVE', 'PAUSED', 'RECOVERY_REQUIRED') ORDER BY created_at DESC LIMIT 1", [], decode_session).optional().map_err(map_read_error)
+        transaction.query_row("SELECT id, planned_duration_ms, started_at, target_end_at, paused_at, total_paused_ms, completed_at, status, pause_count, created_at, updated_at, plant_seed, generator_version, plant_genome_json FROM sessions WHERE status IN ('ACTIVE', 'PAUSED', 'RECOVERY_REQUIRED') ORDER BY created_at DESC LIMIT 1", [], decode_session).optional().map_err(map_read_error)
     }
 
     pub fn update(
@@ -37,6 +37,22 @@ impl FocusSessionRepository {
         session: &FocusSession,
     ) -> Result<(), SessionRepositoryError> {
         let changed = transaction.execute("UPDATE sessions SET target_end_at = ?2, paused_at = ?3, total_paused_ms = ?4, completed_at = ?5, status = ?6, pause_count = ?7, updated_at = ?8 WHERE id = ?1", params![session.id, session.target_end_at, session.paused_at, session.total_paused_ms, session.completed_at, session.status.as_db(), session.pause_count, session.updated_at]).map_err(map_write_error)?;
+        if changed == 1 {
+            Ok(())
+        } else {
+            Err(SessionRepositoryError::NotFound)
+        }
+    }
+
+    pub fn update_generation(
+        &self,
+        transaction: &Transaction<'_>,
+        session: &FocusSession,
+    ) -> Result<(), SessionRepositoryError> {
+        let changed = transaction.execute(
+            "UPDATE sessions SET plant_seed = ?2, generator_version = ?3, plant_genome_json = ?4 WHERE id = ?1",
+            params![session.id, session.plant_seed, session.generator_version, session.plant_genome_json],
+        ).map_err(map_write_error)?;
         if changed == 1 {
             Ok(())
         } else {
@@ -66,6 +82,9 @@ fn decode_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<FocusSession> {
         pause_count: row.get(8)?,
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
+        plant_seed: row.get(11)?,
+        generator_version: row.get(12)?,
+        plant_genome_json: row.get(13)?,
     })
 }
 

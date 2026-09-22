@@ -56,6 +56,11 @@ pub struct FocusSession {
     pub pause_count: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    /// M5's immutable preview bundle. It is produced and validated by the
+    /// application layer because it crosses persistence and generator bounds.
+    pub plant_seed: Option<String>,
+    pub generator_version: Option<i64>,
+    pub plant_genome_json: Option<String>,
 }
 
 impl FocusSession {
@@ -81,6 +86,9 @@ impl FocusSession {
             pause_count: 0,
             created_at: now,
             updated_at: now,
+            plant_seed: None,
+            generator_version: None,
+            plant_genome_json: None,
         })
     }
 

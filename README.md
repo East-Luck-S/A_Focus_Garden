@@ -2,7 +2,7 @@
 
 Focus Garden is a Windows-only focus application planned around a simple loop: a focus session drives real-time growth, produces a deterministic plant, and adds it to a persistent garden.
 
-The project is currently at **M5: Focus Flow & Real-time Growth**. M4 added a pure, accessible SVG renderer that projects a Rust-authoritative plant genome and caller-supplied growth without using native state, clocks, or randomness. Focus-flow wiring, plant persistence, and garden features remain deferred.
+The project has closed **M5: Focus Flow & Real-time Growth** and is now entering M6. M5 wires a calm focus screen to an immutable Rust-authoritative plant preview and real-time display growth. Completion finalization, rewards, persistent plants, and the Garden remain deferred to later milestones.
 
 ## Technology baseline
 
@@ -79,7 +79,7 @@ cargo clippy -- -D warnings
 
 Rust exclusively owns SQLite. React uses a typed native wrapper for the explicit `get_persistence_status` command and has no SQL or database-path access. On native startup, Tauri resolves the application's local data directory, safely creates it when needed, and initializes `focus-garden.sqlite3` there. The precise user-specific directory is intentionally not part of the frontend API or this documentation.
 
-The database has migration tracking (`schema_migrations`), application metadata (`app_metadata`), and persistent focus sessions (`sessions`). Schema changes are atomic and versioned. Rust owns timer truth as UTC milliseconds: `started_at`, `planned_duration_ms`, `target_end_at`, `paused_at`, and `total_paused_ms`. React's one-second interval refreshes only its display projection. Startup turns an interrupted `ACTIVE` session into `RECOVERY_REQUIRED`; paused sessions remain paused. A partial unique database index plus immediate transactions allow only one open session. The schema remains at version 2: the Rust-domain V1 plant genome is not persisted; M4 only adds a deterministic frontend SVG projection for a supplied genome and growth value.
+The database has migration tracking (`schema_migrations`), application metadata (`app_metadata`), and persistent focus sessions (`sessions`). Schema changes are atomic and versioned. Schema version 3 stores an immutable session preview bundle: a fixed-width hexadecimal `u64` seed string, generator version, and exact Rust serde genome JSON. Rust owns timer truth as UTC milliseconds: `started_at`, `planned_duration_ms`, `target_end_at`, `paused_at`, and `total_paused_ms`. React's one-second interval refreshes only its display projection. Startup turns an interrupted `ACTIVE` session into `RECOVERY_REQUIRED`; paused sessions remain paused. A partial unique database index plus immediate transactions allow only one open session. M5 does not create a `plants` table, reward a finished timer, or finalize a session.
 
 ## Windows native build
 
