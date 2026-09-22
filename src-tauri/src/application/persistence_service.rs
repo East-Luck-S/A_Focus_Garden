@@ -43,4 +43,8 @@ impl PersistenceService {
             database_file_name: DATABASE_FILE_NAME,
         })
     }
+
+    pub fn database(&self) -> Database {
+        self.database.clone()
+    }
 }

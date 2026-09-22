@@ -1,2 +1,3 @@
 export { getPersistenceStatus } from "./persistence";
-export type { NativeError, PersistenceStatus } from "./types";
+export { abandonFocusSession, getCurrentFocusSession, pauseFocusSession, resolveFocusSessionRecovery, resumeFocusSession, startFocusSession } from "./focus-session";
+export type { FocusSessionSnapshot, NativeError, PersistenceStatus, RecoveryResolution, SessionStatus } from "./types";

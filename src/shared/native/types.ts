@@ -8,3 +8,22 @@ export type NativeError = {
   code: string;
   message: string;
 };
+
+export type SessionStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "ABANDONED" | "RECOVERY_REQUIRED";
+export type RecoveryResolution = "CONTINUE" | "ABANDON";
+
+export type FocusSessionSnapshot = {
+  id: string;
+  plannedDurationMs: number;
+  startedAt: number;
+  targetEndAt: number;
+  pausedAt: number | null;
+  totalPausedMs: number;
+  completedAt: number | null;
+  status: SessionStatus;
+  pauseCount: number;
+  createdAt: number;
+  updatedAt: number;
+  remainingMs: number;
+  observedAt: number;
+};

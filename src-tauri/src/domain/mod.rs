@@ -1,3 +1,3 @@
-//! Authoritative domain boundary.
-//!
-//! Focus-session and plant-domain code is deferred to later milestones.
+//! Authoritative focus-session domain rules.
+
+pub mod focus_session;

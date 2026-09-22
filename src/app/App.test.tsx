@@ -1,12 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { getPersistenceStatus } from "../shared/native";
+import { getCurrentFocusSession, getPersistenceStatus } from "../shared/native";
 
 import { App } from "./App";
 
 vi.mock("../shared/native", () => ({
   getPersistenceStatus: vi.fn(),
+  getCurrentFocusSession: vi.fn(),
 }));
 
 describe("App", () => {
@@ -16,6 +17,7 @@ describe("App", () => {
       schemaVersion: 1,
       databaseFileName: "focus-garden.sqlite3",
     });
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(null);
     render(<App />);
 
     expect(
@@ -29,6 +31,7 @@ describe("App", () => {
       schemaVersion: 1,
       databaseFileName: "focus-garden.sqlite3",
     });
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(null);
     render(<App />);
 
     expect(await screen.findByText("Persistence ready · Schema v1")).toBeInTheDocument();

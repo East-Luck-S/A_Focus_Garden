@@ -42,6 +42,18 @@ Persistence timestamps use UTC Unix epoch milliseconds. This is timezone-indepen
 
 M1 intentionally leaves SQLite's journal mode at its default. WAL is not needed for the single-user foundation workload and would require explicit backup/restore coordination for sidecar files. The connection policy enables foreign keys and a bounded busy timeout only.
 
+## ADR-011: Rust owns focus-session timer truth
+
+**Status:** Accepted and implemented for M2
+
+The authoritative timer is a persisted wall-clock model in Rust. React may tick for display but cannot progress, pause, resume, complete, or repair a session by itself. This remains correct across rendering delays, window blur/minimize, and application restart.
+
+## ADR-012: Explicit recovery for interrupted active sessions
+
+**Status:** Accepted and implemented for M2
+
+An active session discovered on cold launch changes to `RECOVERY_REQUIRED`; it is never silently completed, abandoned, or rewarded. The user must explicitly continue without inventing paused time or abandon it. Paused sessions remain paused.
+
 ## ADR-005: Just-in-time dependencies
 
 **Status:** Accepted for M0

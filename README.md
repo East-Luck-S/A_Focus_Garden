@@ -2,7 +2,7 @@
 
 Focus Garden is a Windows-only focus application planned around a simple loop: a focus session drives real-time growth, produces a deterministic plant, and adds it to a persistent garden.
 
-The project is currently at **M1: Persistence & Native Boundary Foundation**. It establishes local SQLite initialization, versioned migrations, and one typed native status command. It does not implement the timer, plant generation, sessions, or garden features.
+The project is currently at **M2: Focus Session Domain & Timer**. It establishes a persistent, wall-clock-based focus-session state machine. Plant generation, renderer, and garden features remain deferred.
 
 ## Technology baseline
 
@@ -75,11 +75,11 @@ cargo test
 cargo clippy -- -D warnings
 ```
 
-## Persistence foundation
+## Persistence and focus-session foundation
 
 Rust exclusively owns SQLite. React uses a typed native wrapper for the explicit `get_persistence_status` command and has no SQL or database-path access. On native startup, Tauri resolves the application's local data directory, safely creates it when needed, and initializes `focus-garden.sqlite3` there. The precise user-specific directory is intentionally not part of the frontend API or this documentation.
 
-The database starts with two production tables only: migration tracking (`schema_migrations`) and application metadata (`app_metadata`). Schema changes are applied as atomic, versioned migrations. The M1 Rust tests cover empty-database initialization, idempotency, future-schema rejection, atomic migration failure, foreign keys, transaction commit/rollback, and metadata constraints.
+The database has migration tracking (`schema_migrations`), application metadata (`app_metadata`), and persistent focus sessions (`sessions`). Schema changes are atomic and versioned. Rust owns timer truth as UTC milliseconds: `started_at`, `planned_duration_ms`, `target_end_at`, `paused_at`, and `total_paused_ms`. React's one-second interval refreshes only its display projection. Startup turns an interrupted `ACTIVE` session into `RECOVERY_REQUIRED`; paused sessions remain paused. A partial unique database index plus immediate transactions allow only one open session.
 
 ## Windows native build
 

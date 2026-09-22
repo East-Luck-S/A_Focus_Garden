@@ -13,7 +13,7 @@ fn test_database() -> (tempfile::TempDir, Database) {
 }
 
 #[test]
-fn empty_database_applies_migration_one() {
+fn empty_database_applies_migration_chain() {
     let (_directory, database) = test_database();
     database.initialize().expect("migration should succeed");
 
@@ -33,6 +33,22 @@ fn empty_database_applies_migration_one() {
 
     assert_eq!(version, CURRENT_SCHEMA_VERSION);
     assert_eq!(migration_name, "001_persistence_foundation");
+    let migration_two_name: String = connection
+        .query_row(
+            "SELECT name FROM schema_migrations WHERE version = 2",
+            [],
+            |row| row.get(0),
+        )
+        .expect("migration two should be recorded");
+    assert_eq!(migration_two_name, "002_focus_sessions");
+    let versions: Vec<i64> = connection
+        .prepare("SELECT version FROM schema_migrations ORDER BY version")
+        .expect("migration history query should prepare")
+        .query_map([], |row| row.get(0))
+        .expect("migration history query should run")
+        .collect::<Result<Vec<i64>, _>>()
+        .expect("migration history should decode");
+    assert_eq!(versions, (1..=CURRENT_SCHEMA_VERSION).collect::<Vec<_>>());
 }
 
 #[test]
@@ -59,7 +75,7 @@ fn migrations_are_idempotent() {
         )
         .expect("table list should be readable");
 
-    assert_eq!(migration_count, 1);
+    assert_eq!(migration_count, 2);
     assert_eq!(table_count, 1);
 }
 

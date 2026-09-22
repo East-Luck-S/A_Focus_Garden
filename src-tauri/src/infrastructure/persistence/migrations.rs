@@ -4,7 +4,7 @@ use rusqlite::{params, Connection, Transaction};
 
 use super::{MigrationError, PersistenceError};
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 1;
+pub const CURRENT_SCHEMA_VERSION: i64 = 2;
 
 #[derive(Clone, Copy)]
 pub(crate) struct Migration {
@@ -13,11 +13,18 @@ pub(crate) struct Migration {
     pub apply: for<'transaction> fn(&Transaction<'transaction>) -> rusqlite::Result<()>,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "001_persistence_foundation",
-    apply: apply_persistence_foundation,
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "001_persistence_foundation",
+        apply: apply_persistence_foundation,
+    },
+    Migration {
+        version: 2,
+        name: "002_focus_sessions",
+        apply: apply_focus_sessions,
+    },
+];
 
 pub fn run_migrations(connection: &mut Connection) -> Result<i64, PersistenceError> {
     run_migrations_with(connection, MIGRATIONS, CURRENT_SCHEMA_VERSION)
@@ -148,5 +155,30 @@ fn apply_persistence_foundation(transaction: &Transaction<'_>) -> rusqlite::Resu
             value TEXT NOT NULL,
             updated_at INTEGER NOT NULL
         );",
+    )
+}
+
+fn apply_focus_sessions(transaction: &Transaction<'_>) -> rusqlite::Result<()> {
+    transaction.execute_batch(
+        "CREATE TABLE sessions (
+            id TEXT PRIMARY KEY NOT NULL,
+            planned_duration_ms INTEGER NOT NULL CHECK (planned_duration_ms > 0),
+            started_at INTEGER NOT NULL,
+            target_end_at INTEGER NOT NULL,
+            paused_at INTEGER,
+            total_paused_ms INTEGER NOT NULL DEFAULT 0 CHECK (total_paused_ms >= 0),
+            completed_at INTEGER,
+            status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'PAUSED', 'COMPLETED', 'ABANDONED', 'RECOVERY_REQUIRED')),
+            pause_count INTEGER NOT NULL DEFAULT 0 CHECK (pause_count >= 0),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            CHECK (target_end_at >= started_at),
+            CHECK ((status = 'PAUSED' AND paused_at IS NOT NULL) OR (status != 'PAUSED' AND paused_at IS NULL)),
+            CHECK ((status = 'COMPLETED' AND completed_at IS NOT NULL) OR (status != 'COMPLETED' AND completed_at IS NULL))
+        );
+        CREATE UNIQUE INDEX sessions_single_open_session
+            ON sessions ((1))
+            WHERE status IN ('ACTIVE', 'PAUSED', 'RECOVERY_REQUIRED');
+        CREATE INDEX sessions_status_created_at ON sessions (status, created_at DESC);",
     )
 }

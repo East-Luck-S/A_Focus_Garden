@@ -34,7 +34,7 @@ The M1 `Database` abstraction owns only a database `PathBuf`. Operations use sho
 
 At application setup, Rust resolves Tauri's application-local data directory, creates it if necessary, opens `focus-garden.sqlite3`, applies migrations, and registers the persistence service. Startup failures surface as stable command error codes and never trigger database deletion, reset, or recreation.
 
-Only explicit Tauri commands are registered. M1 exposes `get_persistence_status`; no generic query, execute-SQL, or database command exists. The command delegates to the application service, and command errors are serialized as stable `{ code, message }` values rather than raw SQLite details or user paths.
+Only explicit Tauri commands are registered. M2 exposes persistence status plus current/start/pause/resume/abandon/recovery-resolution focus-session operations; it deliberately does not expose a completion command before M6 finalization exists. No generic query, execute-SQL, or database command exists. Commands delegate to application services, and errors are serialized as stable `{ code, message }` values rather than raw SQLite details or user paths.
 
 ## Schema evolution and timestamps
 
@@ -44,9 +44,15 @@ Only explicit Tauri commands are registered. M1 exposes `get_persistence_status`
 
 The planned SVG renderer is a React/TypeScript projection of an authoritative plant description produced by Rust. Rendering may interpret the description visually, but it must not generate or mutate plant identity, genome, rarity, or growth truth.
 
+## Focus-session timer and recovery
+
+The Rust domain owns the session state machine and timer. Timer truth is `started_at`, `planned_duration_ms`, `target_end_at`, `paused_at`, and `total_paused_ms`, all in UTC Unix epoch milliseconds. Active remaining time is `max(0, target_end_at - now)`; paused remaining time is `max(0, target_end_at - paused_at)`. Resume shifts `target_end_at` by the exact recorded pause duration. Browser intervals refresh only a React projection and never transition a session.
+
+Only one non-terminal session is allowed. Application writes begin in SQLite `BEGIN IMMEDIATE` transactions and the schema has a partial unique index over `ACTIVE`, `PAUSED`, and `RECOVERY_REQUIRED`, so the invariant is not UI-dependent. On launch, persisted `ACTIVE` sessions become `RECOVERY_REQUIRED`; they cannot auto-complete or create rewards. Explicit recovery `CONTINUE` preserves target end time and pause total, while `ABANDON` ends the session. Paused sessions survive launch as paused.
+
 ## Native command boundary
 
-Command payloads form an explicit boundary between frontend intent/projections and Rust application services. The M1 shell exposes only the typed persistence status command.
+Command payloads form an explicit boundary between frontend intent/projections and Rust application services. M2 adds typed focus-session commands while keeping completion internal until its M6 transactional finalizer exists.
 
 ## Runtime constraints
 

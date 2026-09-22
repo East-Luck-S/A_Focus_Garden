@@ -1,11 +1,11 @@
 # Roadmap
 
-Each milestone requires explicit review before work proceeds to the next one.
+M2 is closed within the authorized Epoch A sequence; M3 is now active.
 
 1. **M0 — Repository Foundation & Windows Native Baseline**
 2. **M1 — Persistence & Native Boundary Foundation**
-3. **M2 — Focus Session Domain & Timer**
-4. **M3 — Deterministic Plant Generator V1**
+3. **M2 — Focus Session Domain & Timer** — CLOSED
+4. **M3 — Deterministic Plant Generator V1** — ACTIVE
 5. **M4 — SVG Plant Renderer V1**
 6. **M5 — Focus Flow & Real-time Growth**
 7. **M6 — MVP Transactional Vertical Slice**
@@ -18,4 +18,4 @@ Each milestone requires explicit review before work proceeds to the next one.
 14. **M13 — Release Hardening**
 15. **V1.0 — Windows Release**
 
-This roadmap names scope; it does not authorize implementation ahead of the active milestone. M1 must not begin until M0 receives human approval.
+This roadmap names scope. Epoch A authorizes continuous implementation from M2 through M6 only after each milestone gate passes; M3 is the active milestone and M7 remains out of scope.
