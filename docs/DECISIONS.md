@@ -54,6 +54,12 @@ The authoritative timer is a persisted wall-clock model in Rust. React may tick 
 
 An active session discovered on cold launch changes to `RECOVERY_REQUIRED`; it is never silently completed, abandoned, or rewarded. The user must explicitly continue without inventing paused time or abandon it. Paused sessions remain paused.
 
+## ADR-013: Versioned deterministic plant-generation contract
+
+**Status:** Accepted and implemented for M3
+
+Plant generation is a pure Rust-domain contract. V1 resolves a seed from validated stable input with documented FNV-1a 64-bit hashing and generates its genome with a fixed integer SplitMix64 PRNG. It neither reads a clock nor uses uncontrolled randomness. The public genome uses ordered structs, enums, vectors, and integer fields so serialized output remains stable. Generator versions are explicit and unsupported versions fail rather than silently changing a saved plant's meaning.
+
 ## ADR-005: Just-in-time dependencies
 
 **Status:** Accepted for M0

@@ -37,4 +37,8 @@ Created by immutable `002_focus_sessions`. It is the canonical M2 focus-session 
 | `pause_count` | `INTEGER` | Number of successful pauses. |
 | `created_at` / `updated_at` | `INTEGER` | UTC milliseconds for persistence auditing. |
 
-`sessions_single_open_session` is a partial unique index across non-terminal statuses, preventing more than one `ACTIVE`, `PAUSED`, or `RECOVERY_REQUIRED` session. The M2 schema intentionally has no plant, genome, rarity, garden, statistics, achievement, or tag table. Future schema changes must append a new versioned migration; existing migration definitions are immutable.
+`sessions_single_open_session` is a partial unique index across non-terminal statuses, preventing more than one `ACTIVE`, `PAUSED`, or `RECOVERY_REQUIRED` session. M3 deliberately retains schema version 2: the deterministic V1 genome is a Rust-domain value only and is not persisted until a later authorized milestone. Future schema changes must append a new versioned migration; existing migration definitions are immutable.
+
+## M3 deterministic plant genome (domain value)
+
+`PlantGenerationInput` is the stable generation-time value: `session_id`, `planned_duration_ms`, `started_at`, and `generator_version`. It resolves to a `u64` seed through a documented FNV-1a 64-bit byte contract (little-endian numeric fields and length-prefixed UTF-8 session ID). `generate_plant(seed, 1)` produces `PlantGenome` V1, containing morphology, stem, ordered leaves, flower, palette, and effects. Genomes contain only explicitly ordered structs, enums, vectors, and integers, so serialization does not depend on hash-map iteration or floating-point behavior. The seed is designed to be saveable when plant persistence is introduced.

@@ -42,7 +42,7 @@ Only explicit Tauri commands are registered. M2 exposes persistence status plus 
 
 ## Future plant renderer boundary
 
-The planned SVG renderer is a React/TypeScript projection of an authoritative plant description produced by Rust. Rendering may interpret the description visually, but it must not generate or mutate plant identity, genome, rarity, or growth truth.
+The planned SVG renderer is a React/TypeScript projection of an authoritative plant genome produced by Rust. Rendering may interpret the description visually, but it must not generate or mutate plant identity, genome, rarity, or growth truth. M3's generator is a pure Rust-domain function: stable generation input resolves to a saveable seed, and the V1 generator replayably maps that seed to an ordered, integer-only genome. It has no React, SVG, Tauri, SQLite, clock, or uncontrolled-randomness dependency.
 
 ## Focus-session timer and recovery
 
