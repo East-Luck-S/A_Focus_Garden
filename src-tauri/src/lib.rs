@@ -36,6 +36,7 @@ pub fn run() -> Result<(), AppError> {
             interface::commands::focus_session::resolve_focus_session_recovery,
             interface::commands::focus_session::finalize_focus_session,
             interface::commands::focus_session::list_garden_plants,
+            interface::commands::focus_session::get_garden_overview,
             interface::commands::focus_session::get_garden_plant
         ])
         .run(tauri::generate_context!())

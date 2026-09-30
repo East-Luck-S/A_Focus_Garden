@@ -6,13 +6,10 @@ import {
   getAppSettings,
   getCurrentFocusSession,
   getPersistenceStatus,
-  listGardenPlants,
   nativeErrorMessage,
   updateAppSettings,
   type AppSettings,
   type FocusSessionSnapshot,
-  type GardenPlantDetail,
-  type GardenPlantSummary,
 } from "../shared/native";
 
 type BootState = "LOADING" | "READY" | "FATAL";
@@ -23,14 +20,8 @@ export function ProductShell() {
   const [fatal, setFatal] = useState<unknown>(null);
   const [session, setSession] = useState<FocusSessionSnapshot | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [plants, setPlants] = useState<GardenPlantSummary[]>([]);
-  const [gardenError, setGardenError] = useState<unknown>(null);
+  const [gardenRevision, setGardenRevision] = useState(0);
   const [view, setView] = useState<View>("FOCUS");
-
-  const loadGarden = useCallback(() => {
-    setGardenError(null);
-    void listGardenPlants().then(setPlants).catch(setGardenError);
-  }, []);
 
   const loadCore = useCallback(
     async () =>
@@ -50,7 +41,6 @@ export function ProductShell() {
         setSession(nextSession);
         setSettings(nextSettings);
         setBoot("READY");
-        loadGarden();
       })
       .catch((reason: unknown) => {
         setFatal(reason);
@@ -64,18 +54,15 @@ export function ProductShell() {
         setSession(nextSession);
         setSettings(nextSettings);
         setBoot("READY");
-        loadGarden();
       })
       .catch((reason: unknown) => {
         setFatal(reason);
         setBoot("FATAL");
       });
-  }, [loadCore, loadGarden]);
+  }, [loadCore]);
 
-  const handlePlanted = (plant: GardenPlantDetail) => {
-    setPlants((current) =>
-      current.some((item) => item.id === plant.id) ? current : [plant, ...current],
-    );
+  const handlePlanted = () => {
+    setGardenRevision((current) => current + 1);
   };
 
   const saveSettings = async (durationMs: number) => {
@@ -115,7 +102,10 @@ export function ProductShell() {
 
   return (
     <main className="focus-shell">
-      <section className="focus-card" aria-labelledby="app-title">
+      <section
+        className={view === "GARDEN" ? "focus-card garden-shell-card" : "focus-card"}
+        aria-labelledby="app-title"
+      >
         <header className="app-header">
           <div>
             <p className="eyebrow">专注花园 / Focus Garden</p>
@@ -151,11 +141,7 @@ export function ProductShell() {
             onOpenGarden={() => setView("GARDEN")}
           />
         ) : (
-          <GardenScreen
-            plants={plants}
-            loadError={gardenError}
-            onRetry={loadGarden}
-          />
+          <GardenScreen refreshKey={gardenRevision} />
         )}
       </section>
     </main>

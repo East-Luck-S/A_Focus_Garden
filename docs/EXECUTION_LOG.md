@@ -1,5 +1,11 @@
 # Execution Log
 
+## M9 — Core Garden & Local Overview — CLOSED
+
+- Schema remains version 5: M9 adds no migration, table, or index. Rust exposes a bounded keyset Garden page (default 24, maximum 50), explicit plant detail, and a single-query aggregate overview over the existing plant/session relationship.
+- The Chinese Garden projection loads only when entered, leaving Focus boot independent. It displays safe summaries, appends deduplicated pages, preserves loaded cards on later-page failure, and presents a focus-managed accessible detail dialog without source IDs or seeds.
+- Validation recorded for M9: Rust 48 tests and frontend 41 tests, plus typecheck, lint, production build, Cargo formatting/check/test/clippy, and diff checks.
+
 ## M8 — Formal Focus Flow & Duration Settings — CLOSED
 
 - Schema version 5 adds a lossless singleton `app_settings` default duration, initialized to 25 minutes and constrained to 1–180 minutes in SQLite and Rust.

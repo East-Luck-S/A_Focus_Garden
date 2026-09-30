@@ -72,6 +72,12 @@ The default focus duration is a singleton SQLite setting. Rust accepts only 1–
 
 React presents an accessible confirmation before requesting abandonment, because it ends a session without creating a plant. Rust still validates and applies the requested transition authoritatively.
 
+## ADR-019: Garden uses keyset pagination and privacy-preserving summaries
+
+**Status:** Accepted and implemented for M9
+
+Garden lists use a descending `(planted_at, id)` keyset cursor rather than offsets, so insertion history has stable page boundaries and no row must be skipped or re-read to advance a page. The summary DTO contains only presentation-safe plant and focus facts; source session identifiers, seeds, raw generation payloads, and internal error data remain available only to authoritative Rust code or explicit safe projections.
+
 ## ADR-014: Persist immutable session preview bundles
 
 **Status:** Accepted and implemented for M5

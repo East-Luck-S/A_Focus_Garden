@@ -11,7 +11,7 @@ Created by `005_app_settings`. This singleton table is the canonical persisted d
 | `singleton` | `INTEGER PRIMARY KEY` | Always `1`, enforced by `CHECK`. |
 | `default_focus_duration_ms` | `INTEGER` | Default duration, constrained to `60000..10800000` (1–180 minutes); migration default is 25 minutes. |
 
-This document records the persistence model through M6. Business-domain tables begin with the immutable M2 `sessions` schema and its append-only migrations.
+This document records the persistence model through M9. Business-domain tables begin with the immutable M2 `sessions` schema and its append-only migrations.
 
 ## `schema_migrations`
 
@@ -72,6 +72,10 @@ SQLite insert/update triggers require this bundle to be all-null or all-present.
 Migration 004 and startup auditing require every `COMPLETED` session to have exactly one matching plant and every other session to have none. Foreign keys, exact-match insertion triggers, and immutable plant/session triggers enforce the relationship. The application never repairs a missing or mismatched receipt; it returns `DATA_SAFETY_BLOCKER`.
 
 M6 native acceptance also independently verified the resulting production journal read-only: history `[1,2,3,4]`, one completed session and one plant, no open session, one exact joined invariant, an empty foreign-key check, and `integrity_check = ok`.
+
+## M9 Garden read model
+
+M9 adds no migration: the schema remains version 5. The Garden page and overview are read models over the existing `plants` and `sessions` relationship. Summaries contain the plant's display genome, `planted_at`, source planned duration, and source pause count; they do not expose the source session ID or seed to the product UI. Keyset pagination uses the existing `planted_at` and plant `id` values as the descending `(planted_at, id)` cursor. No M9-specific table or index is introduced; the joined read path is explicitly audited as a single query, and a future additive index remains possible if production profiling warrants one.
 
 ## M3 deterministic plant genome (domain value)
 

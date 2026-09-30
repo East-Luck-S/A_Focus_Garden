@@ -1,6 +1,6 @@
 # Roadmap
 
-M8 is closed. M9 is the active milestone; the product shell and formal focus flow are Chinese-first.
+M9 is closed. M10 is the active milestone; the product shell, formal focus flow, and local Garden overview are Chinese-first.
 
 1. **M0 — Repository Foundation & Windows Native Baseline**
 2. **M1 — Persistence & Native Boundary Foundation**
@@ -11,11 +11,11 @@ M8 is closed. M9 is the active milestone; the product shell and formal focus flo
 7. **M6 — MVP Transactional Vertical Slice** — CLOSED
 8. **M7 — Chinese Product Shell** — CLOSED
 9. **M8 — Formal Focus Flow & Duration Settings** — CLOSED
-10. **M9 — Core Garden & Local Overview** — ACTIVE
-11. **M10 — Chinese Windows Release Candidate** — PLANNED
+10. **M9 — Core Garden & Local Overview** — CLOSED
+11. **M10 — Chinese Windows Release Candidate** — ACTIVE
 12. **M11 — Plant System Expansion & Visual Quality** — DEFERRED
 13. **M12 — UX / Accessibility / Performance Hardening**
 14. **M13 — Release Hardening**
 15. **V1.0 — Windows Release**
 
-This roadmap names scope. M7 established the Chinese-first shell and M8 established formal duration settings and focus-flow interaction. M9 is active; M11 and later milestones remain deferred.
+This roadmap names scope. M7 established the Chinese-first shell, M8 established formal duration settings and focus-flow interaction, and M9 established the local Garden overview. M11 and later milestones remain deferred.

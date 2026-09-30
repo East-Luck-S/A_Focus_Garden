@@ -16,6 +16,7 @@ const localizedCopy: Record<string, string> = {
   SESSION_GENERATION_DATA_INVALID: "这次专注的植物数据无法安全读取。已停止以保护本机数据，不会自动重置。",
   SESSION_DATA_INVALID: "这次专注的存储数据无法安全读取。已停止以保护本机数据，不会自动重置。",
   INVALID_FOCUS_DURATION: "请选择有效的专注时长后重试。",
+  GARDEN_QUERY_INVALID: "花园分页请求无效，请重新打开花园后重试。",
   OPEN_SESSION_EXISTS: "已有一项未结束的专注，请先继续、完成或放弃它。",
   SESSION_NOT_FOUND: "未找到这次专注记录。请刷新后重试。",
   SESSION_INVALID_TRANSITION: "当前状态不能执行此操作。请刷新后重试。",

@@ -34,7 +34,7 @@ The M1 `Database` abstraction owns only a database `PathBuf`. Operations use sho
 
 At application setup, Rust resolves Tauri's application-local data directory, creates it if necessary, opens `focus-garden.sqlite3`, applies migrations, and registers the persistence service. Startup failures surface as stable command error codes and never trigger database deletion, reset, or recreation.
 
-Only explicit Tauri commands are registered. M6 adds `finalize_focus_session`, `list_garden_plants`, and `get_garden_plant`; no generic query or execute-SQL command exists. `finalize_focus_session` alone transitions an eligible active session and inserts its exact immutable plant in one `BEGIN IMMEDIATE` transaction. A completed retry only reads and verifies its matching plant, and missing/mismatched transactional data is a `DATA_SAFETY_BLOCKER`, never an auto-repair.
+Only explicit Tauri commands are registered. M9 exposes `finalize_focus_session`, paged `list_garden_plants`, `get_garden_overview`, and `get_garden_plant`; no generic query or execute-SQL command exists. `finalize_focus_session` alone transitions an eligible active session and inserts its exact immutable plant in one `BEGIN IMMEDIATE` transaction. A completed retry only reads and verifies its matching plant, and missing/mismatched transactional data is a `DATA_SAFETY_BLOCKER`, never an auto-repair.
 
 The M6 native acceptance exercised this boundary through the release executable: start a legal one-minute session, fully exit, restart after the target time, explicitly continue recovery, finalize, then fully exit and restart into the same persisted Garden plant. A read-only SQLite post-check confirmed migration history, exact session/plant identity, foreign keys, and integrity. This is runtime evidence, not an alternate application path.
 
@@ -66,9 +66,13 @@ Command payloads form an explicit boundary between frontend intent/projections a
 
 M8 adds typed `get_app_settings` and `update_app_settings` commands. SQLite stores the canonical default duration; Rust validates every settings update and every session start at 1–180 minutes, independent of React. React keeps only transient custom-input state. Its UI serializes settings, start, session transitions, finalization, and abandonment through a single pending-action projection. Abandonment requires explicit accessible confirmation in React, while Rust remains authoritative for whether the transition is legal. Completion remains an explicit native transaction and is shown as a client-side result projection rather than an automatic Garden navigation.
 
+## M9 Garden read boundary
+
+Garden data is a read projection loaded only when the user enters the Garden view; it is not part of Focus boot. Rust lists Garden summaries with a keyset cursor `(planted_at, id)`, descending by both fields. The frontend requests 24-item pages, while the native service accepts only 1–50 items and fetches one extra row to determine the next cursor. Each page is one joined `plants`/`sessions` query, not an N+1 sequence; the overview is a separate single aggregate join query. Plant details remain an explicit command, requested only after a user opens a card. React may append pages, de-duplicate IDs for presentation, and render failure/retry state, but does not calculate canonical Garden data.
+
 ## M7 product shell and native error boundary
 
-M7 keeps Rust commands and the data model unchanged. The React shell has explicit loading, ready, and fatal startup states. Persistence or current-session failures stop the shell and offer retry without automatic data reset. Garden-list failure is isolated to the Garden projection and never blocks Focus. Typed native wrappers normalize rejected object, string, and unknown values to a stable frontend error shape; localized Chinese copy is selected by Rust's stable error code, while raw native messages and internal identifiers remain private.
+M7 keeps Rust commands and the data model unchanged. The React shell has explicit loading, ready, and fatal startup states. Persistence or current-session failures stop the shell and offer retry without automatic data reset. Garden read failure is isolated to the Garden projection and never blocks Focus. Typed native wrappers normalize rejected object, string, and unknown values to a stable frontend error shape; localized Chinese copy is selected by Rust's stable error code, while raw native messages and internal identifiers remain private.
 
 ## Runtime constraints
 

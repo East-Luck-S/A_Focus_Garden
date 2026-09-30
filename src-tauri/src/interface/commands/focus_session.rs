@@ -3,8 +3,8 @@ use tauri::State;
 
 use crate::{
     application::focus_session_service::{
-        FocusSessionService, FocusSessionServiceError, FocusSessionSnapshot, GardenPlantDetail,
-        GardenPlantSummary,
+        FocusSessionService, FocusSessionServiceError, FocusSessionSnapshot, GardenOverview,
+        GardenPlantDetail, GardenPlantPage, ListGardenPlantsRequest,
     },
     domain::focus_session::RecoveryResolution,
     interface::commands::persistence::NativeError,
@@ -33,9 +33,19 @@ pub fn finalize_focus_session(
 
 #[tauri::command]
 pub fn list_garden_plants(
+    request: ListGardenPlantsRequest,
     service: State<'_, FocusSessionService>,
-) -> Result<Vec<GardenPlantSummary>, NativeError> {
-    service.list_garden_plants().map_err(NativeError::from)
+) -> Result<GardenPlantPage, NativeError> {
+    service
+        .list_garden_plants_page(request)
+        .map_err(NativeError::from)
+}
+
+#[tauri::command]
+pub fn get_garden_overview(
+    service: State<'_, FocusSessionService>,
+) -> Result<GardenOverview, NativeError> {
+    service.get_garden_overview().map_err(NativeError::from)
 }
 
 #[tauri::command]
@@ -113,6 +123,10 @@ impl From<FocusSessionServiceError> for NativeError {
             infrastructure::focus_session_repository::SessionRepositoryError,
         };
         match error {
+            FocusSessionServiceError::GardenQueryInvalid => Self {
+                code: "GARDEN_QUERY_INVALID",
+                message: "The garden page request is invalid.",
+            },
             FocusSessionServiceError::Domain(SessionError::InvalidDuration) => Self {
                 code: "INVALID_FOCUS_DURATION",
                 message: "Choose a valid focus duration.",

@@ -6,6 +6,7 @@ import {
   getAppSettings,
   updateAppSettings,
   getPersistenceStatus,
+  getGardenOverview,
   abandonFocusSession,
   finalizeFocusSession,
   listGardenPlants,
@@ -33,7 +34,7 @@ vi.mock("../shared/native", () => ({
   getAppSettings: vi.fn(), updateAppSettings: vi.fn(),
   pauseFocusSession: vi.fn(), resumeFocusSession: vi.fn(), abandonFocusSession: vi.fn(),
   resolveFocusSessionRecovery: vi.fn(),
-  listGardenPlants: vi.fn(), getGardenPlant: vi.fn(), finalizeFocusSession: vi.fn(),
+  listGardenPlants: vi.fn(), getGardenOverview: vi.fn(), getGardenPlant: vi.fn(), finalizeFocusSession: vi.fn(),
   nativeErrorMessage: (reason: unknown) => reason && typeof reason === "object" && "code" in reason && reason.code === "DATA_SAFETY_BLOCKER"
     ? "已停止以保护本机数据，不会自动重置。请保留当前数据并联系支持人员。"
     : "操作暂时无法完成。请检查应用状态后重试。",
@@ -61,7 +62,8 @@ describe("App", () => {
     vi.mocked(getAppSettings).mockResolvedValue({ defaultFocusDurationMs: 1_500_000 });
     vi.mocked(updateAppSettings).mockResolvedValue({ defaultFocusDurationMs: 1_500_000 });
     vi.mocked(getCurrentFocusSession).mockResolvedValue(null);
-    vi.mocked(listGardenPlants).mockResolvedValue([]);
+    vi.mocked(listGardenPlants).mockResolvedValue({ items: [], nextCursor: null });
+    vi.mocked(getGardenOverview).mockResolvedValue({ plantCount: 0, totalPlannedDurationMs: 0 });
     vi.mocked(startFocusSession).mockResolvedValue(session());
   });
   afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -189,15 +191,19 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "25分钟" })).toBeInTheDocument();
   });
 
-  it("keeps Focus available when the Garden list fails and retries Garden", async () => {
-    vi.mocked(listGardenPlants).mockRejectedValueOnce("failed").mockResolvedValueOnce([]);
+  it("loads Garden only after navigation, without blocking Focus when the request fails", async () => {
+    vi.mocked(listGardenPlants)
+      .mockRejectedValueOnce("failed")
+      .mockResolvedValueOnce({ items: [], nextCursor: null });
     render(<App />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.getByRole("button", { name: "15分钟" })).toBeInTheDocument();
+    expect(listGardenPlants).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "花园" }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.getByRole("button", { name: "重试读取花园" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重试读取花园" }));
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.getByText("你的花园正在等待第一株完成专注后种下的植物。")).toBeInTheDocument();
   });
 

@@ -38,9 +38,18 @@ export type GardenPlantSummary = {
   plantedAt: number;
   generatorVersion: number;
   plantGenome: import("../plant").PlantGenome;
+  sourcePlannedDurationMs: number;
+  sourcePauseCount: number;
 };
+export type GardenCursor = { plantedAt: number; id: string };
+export type GardenPlantPage = { items: GardenPlantSummary[]; nextCursor: GardenCursor | null };
+export type GardenOverview = { plantCount: number; totalPlannedDurationMs: number };
 
-export type GardenPlantDetail = GardenPlantSummary & {
+export type GardenPlantDetail = {
+  id: string;
+  plantedAt: number;
+  generatorVersion: number;
+  plantGenome: import("../plant").PlantGenome;
   plantSeed: string;
   sourceSession: {
     id: string;
