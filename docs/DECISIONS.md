@@ -60,6 +60,18 @@ An active session discovered on cold launch changes to `RECOVERY_REQUIRED`; it i
 
 Plant generation is a pure Rust-domain contract. V1 resolves a seed from validated stable input with documented FNV-1a 64-bit hashing and generates its genome with a fixed integer SplitMix64 PRNG. It neither reads a clock nor uses uncontrolled randomness. The public genome uses ordered structs, enums, vectors, and integer fields so serialized output remains stable. Generator versions are explicit and unsupported versions fail rather than silently changing a saved plant's meaning.
 
+## ADR-017: Canonical default duration lives in SQLite
+
+**Status:** Accepted and implemented for M8
+
+The default focus duration is a singleton SQLite setting. Rust accepts only 1–180 minutes for both settings and session starts. A React custom-duration field is transient UI input and never canonical state.
+
+## ADR-018: Abandonment requires explicit UI confirmation
+
+**Status:** Accepted and implemented for M8
+
+React presents an accessible confirmation before requesting abandonment, because it ends a session without creating a plant. Rust still validates and applies the requested transition authoritatively.
+
 ## ADR-014: Persist immutable session preview bundles
 
 **Status:** Accepted and implemented for M5

@@ -89,8 +89,57 @@ fn migrations_are_idempotent() {
         )
         .expect("table list should be readable");
 
-    assert_eq!(migration_count, 4);
+    assert_eq!(migration_count, 5);
     assert_eq!(table_count, 1);
+}
+
+#[test]
+fn actual_v4_database_upgrades_to_v5_without_losing_sessions() {
+    let (_directory, database) = test_database();
+    let mut connection = database.open_connection().expect("database should open");
+    let migrations = registered_migrations_for_tests();
+
+    run_migrations_with(&mut connection, &migrations[..4], 4)
+        .expect("v4 migration chain should succeed");
+    connection
+        .execute(
+            "INSERT INTO sessions (
+                id, planned_duration_ms, started_at, target_end_at,
+                total_paused_ms, status, pause_count, created_at, updated_at
+             ) VALUES ('v4-abandoned', 60000, 1000, 61000, 0, 'ABANDONED', 0, 1000, 2000)",
+            [],
+        )
+        .expect("v4 session fixture should be insertable");
+    assert!(!table_exists(&connection, "app_settings"));
+
+    run_migrations_with(&mut connection, migrations, CURRENT_SCHEMA_VERSION)
+        .expect("v5 settings migration should succeed");
+
+    let preserved_sessions: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sessions WHERE id = 'v4-abandoned'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("historical session should remain readable");
+    let default_duration: i64 = connection
+        .query_row(
+            "SELECT default_focus_duration_ms FROM app_settings WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .expect("default setting should be seeded");
+    let versions: Vec<i64> = connection
+        .prepare("SELECT version FROM schema_migrations ORDER BY version")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+
+    assert_eq!(preserved_sessions, 1);
+    assert_eq!(default_duration, 25 * 60_000);
+    assert_eq!(versions, vec![1, 2, 3, 4, 5]);
 }
 
 #[test]
@@ -137,7 +186,7 @@ fn actual_v2_database_upgrades_to_v4_without_losing_a_session_then_hydrates_on_l
         .unwrap()
         .collect::<Result<Vec<i64>, _>>()
         .unwrap();
-    assert_eq!(versions, vec![1, 2, 3, 4]);
+    assert_eq!(versions, vec![1, 2, 3, 4, 5]);
     let preserved: (String, i64, i64, i64, String, Option<String>, Option<i64>, Option<String>) = connection.query_row(
         "SELECT id, planned_duration_ms, started_at, target_end_at, status, plant_seed, generator_version, plant_genome_json FROM sessions WHERE id = 'v2-active'",
         [],

@@ -3,6 +3,7 @@ export type PersistenceStatus = {
   schemaVersion: number;
   databaseFileName: string;
 };
+export type AppSettings = { defaultFocusDurationMs: number };
 
 export type NativeError = {
   code: string;

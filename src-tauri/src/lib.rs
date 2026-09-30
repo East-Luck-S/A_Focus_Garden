@@ -26,6 +26,8 @@ pub fn run() -> Result<(), AppError> {
         })
         .invoke_handler(tauri::generate_handler![
             interface::commands::persistence::get_persistence_status,
+            interface::commands::persistence::get_app_settings,
+            interface::commands::persistence::update_app_settings,
             interface::commands::focus_session::get_current_focus_session,
             interface::commands::focus_session::start_focus_session,
             interface::commands::focus_session::pause_focus_session,

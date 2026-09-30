@@ -5,7 +5,7 @@ use rusqlite::{params, Connection, Transaction};
 use super::{MigrationError, PersistenceError};
 use crate::domain::plant_bundle::validate_bundle;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 4;
+pub const CURRENT_SCHEMA_VERSION: i64 = 5;
 
 #[derive(Clone, Copy)]
 pub(crate) struct Migration {
@@ -34,6 +34,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 4,
         name: "004_transactional_plants",
         apply: apply_transactional_plants,
+    },
+    Migration {
+        version: 5,
+        name: "005_app_settings",
+        apply: apply_app_settings,
     },
 ];
 
@@ -369,5 +374,15 @@ fn apply_transactional_plants(transaction: &Transaction<'_>) -> rusqlite::Result
         BEFORE UPDATE OF status, completed_at, plant_seed, generator_version, plant_genome_json ON sessions
         WHEN EXISTS (SELECT 1 FROM plants p WHERE p.source_session_id = OLD.id)
         BEGIN SELECT RAISE(ABORT, 'completed plant source session is immutable'); END;"
+    )
+}
+
+fn apply_app_settings(transaction: &Transaction<'_>) -> rusqlite::Result<()> {
+    transaction.execute_batch(
+        "CREATE TABLE app_settings (
+            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+            default_focus_duration_ms INTEGER NOT NULL CHECK (default_focus_duration_ms BETWEEN 60000 AND 10800000)
+        );
+        INSERT INTO app_settings (singleton, default_focus_duration_ms) VALUES (1, 1500000);",
     )
 }

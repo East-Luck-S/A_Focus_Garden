@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::{
-    application::persistence_service::{PersistenceService, PersistenceStatus},
+    application::persistence_service::{AppSettings, PersistenceService, PersistenceStatus},
     infrastructure::persistence::{AppError, PersistenceError},
 };
 
@@ -31,6 +31,9 @@ impl From<AppError> for NativeError {
 impl From<PersistenceError> for NativeError {
     fn from(error: PersistenceError) -> Self {
         let (code, message) = match error {
+            PersistenceError::InvalidFocusDuration => {
+                ("INVALID_FOCUS_DURATION", "Choose a valid focus duration.")
+            }
             PersistenceError::DataSafetyBlocker => (
                 "DATA_SAFETY_BLOCKER",
                 "Focus Garden stopped because its transactional journal is inconsistent.",
@@ -70,6 +73,29 @@ impl From<PersistenceError> for NativeError {
         };
         Self { code, message }
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAppSettingsRequest {
+    pub default_focus_duration_ms: i64,
+}
+
+#[tauri::command]
+pub fn get_app_settings(
+    service: State<'_, PersistenceService>,
+) -> Result<AppSettings, NativeError> {
+    service.get_app_settings().map_err(NativeError::from)
+}
+
+#[tauri::command]
+pub fn update_app_settings(
+    request: UpdateAppSettingsRequest,
+    service: State<'_, PersistenceService>,
+) -> Result<AppSettings, NativeError> {
+    service
+        .update_app_settings(request.default_focus_duration_ms)
+        .map_err(NativeError::from)
 }
 
 #[tauri::command]

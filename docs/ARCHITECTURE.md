@@ -62,6 +62,10 @@ Rust snapshots include the immutable preview and a remaining-time observation. R
 
 Command payloads form an explicit boundary between frontend intent/projections and Rust application services. M2 adds typed focus-session commands while keeping completion internal until its M6 transactional finalizer exists.
 
+## M8 settings and formal focus-flow boundary
+
+M8 adds typed `get_app_settings` and `update_app_settings` commands. SQLite stores the canonical default duration; Rust validates every settings update and every session start at 1–180 minutes, independent of React. React keeps only transient custom-input state. Its UI serializes settings, start, session transitions, finalization, and abandonment through a single pending-action projection. Abandonment requires explicit accessible confirmation in React, while Rust remains authoritative for whether the transition is legal. Completion remains an explicit native transaction and is shown as a client-side result projection rather than an automatic Garden navigation.
+
 ## M7 product shell and native error boundary
 
 M7 keeps Rust commands and the data model unchanged. The React shell has explicit loading, ready, and fatal startup states. Persistence or current-session failures stop the shell and offer retry without automatic data reset. Garden-list failure is isolated to the Garden projection and never blocks Focus. Typed native wrappers normalize rejected object, string, and unknown values to a stable frontend error shape; localized Chinese copy is selected by Rust's stable error code, while raw native messages and internal identifiers remain private.

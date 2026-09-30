@@ -1,5 +1,16 @@
 # Data Model
 
+Current schema version: **5**. Migrations `001` through `004` are immutable historical definitions; upgrading an existing local database appends migration `005` without deleting or resetting user data.
+
+## `app_settings`
+
+Created by `005_app_settings`. This singleton table is the canonical persisted default for a new focus session.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `singleton` | `INTEGER PRIMARY KEY` | Always `1`, enforced by `CHECK`. |
+| `default_focus_duration_ms` | `INTEGER` | Default duration, constrained to `60000..10800000` (1–180 minutes); migration default is 25 minutes. |
+
 This document records the persistence model through M6. Business-domain tables begin with the immutable M2 `sessions` schema and its append-only migrations.
 
 ## `schema_migrations`

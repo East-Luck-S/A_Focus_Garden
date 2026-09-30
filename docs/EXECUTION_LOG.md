@@ -1,5 +1,11 @@
 # Execution Log
 
+## M8 — Formal Focus Flow & Duration Settings — CLOSED
+
+- Schema version 5 adds a lossless singleton `app_settings` default duration, initialized to 25 minutes and constrained to 1–180 minutes in SQLite and Rust.
+- The Chinese formal flow persists preset or valid custom durations, serializes pending actions, confirms abandonment explicitly, and retains completion as a result card until the user chooses the Garden or another focus.
+- Final validation is recorded with the M8 delivery commit.
+
 ## M7 — Chinese Product Shell — CLOSED
 
 - Replaced the English prototype surface with a Chinese-first shell, explicit loading/ready/fatal startup states, retry, localized status/date rendering, and accessible navigation controls.

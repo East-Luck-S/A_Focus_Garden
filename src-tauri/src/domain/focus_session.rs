@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const MINIMUM_FOCUS_DURATION_MS: i64 = 60_000;
+pub const MAXIMUM_FOCUS_DURATION_MS: i64 = 180 * 60_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -65,7 +66,7 @@ pub struct FocusSession {
 
 impl FocusSession {
     pub fn start(id: String, planned_duration_ms: i64, now: i64) -> Result<Self, SessionError> {
-        if planned_duration_ms < MINIMUM_FOCUS_DURATION_MS {
+        if !(MINIMUM_FOCUS_DURATION_MS..=MAXIMUM_FOCUS_DURATION_MS).contains(&planned_duration_ms) {
             return Err(SessionError::InvalidDuration);
         }
         if now < 0 {
@@ -293,10 +294,14 @@ mod tests {
             FocusSession::start("id".into(), 60_000, -1),
             Err(SessionError::TimeValueInvalid)
         );
+        assert_eq!(
+            FocusSession::start("id".into(), MAXIMUM_FOCUS_DURATION_MS + 1, 0),
+            Err(SessionError::InvalidDuration)
+        );
         let mut session = active();
         assert_eq!(session.pause(999), Err(SessionError::TimeValueInvalid));
         assert_eq!(
-            FocusSession::start("id".into(), i64::MAX, 1),
+            FocusSession::start("id".into(), MAXIMUM_FOCUS_DURATION_MS, i64::MAX - 1),
             Err(SessionError::TimeValueInvalid)
         );
     }

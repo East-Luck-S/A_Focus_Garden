@@ -14,6 +14,8 @@ pub enum AppError {
 
 #[derive(Debug, Error)]
 pub enum PersistenceError {
+    #[error("the focus duration is invalid")]
+    InvalidFocusDuration,
     #[error("unable to create the persistence directory")]
     Directory(#[source] std::io::Error),
     #[error("unable to open the SQLite database")]
