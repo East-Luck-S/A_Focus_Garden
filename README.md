@@ -2,7 +2,7 @@
 
 Focus Garden is a Windows-only focus application planned around a simple loop: a focus session drives real-time growth, produces a deterministic plant, and adds it to a persistent garden.
 
-The project has closed **M6: MVP Transactional Vertical Slice** and completed Epoch A. A completed focus session is finalized only by one native SQLite transaction that writes its immutable plant receipt; the Garden is a minimal read projection of those receipts. M7 has not started.
+The project has closed **M7: Chinese Product Shell**. The application is Chinese-first and starts through explicit loading, ready, and data-safe fatal states. A completed focus session is still finalized only by one native SQLite transaction that writes its immutable plant receipt; the Garden remains a read projection of those receipts.
 
 ## Technology baseline
 

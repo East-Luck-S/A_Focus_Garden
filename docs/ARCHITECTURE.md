@@ -62,6 +62,10 @@ Rust snapshots include the immutable preview and a remaining-time observation. R
 
 Command payloads form an explicit boundary between frontend intent/projections and Rust application services. M2 adds typed focus-session commands while keeping completion internal until its M6 transactional finalizer exists.
 
+## M7 product shell and native error boundary
+
+M7 keeps Rust commands and the data model unchanged. The React shell has explicit loading, ready, and fatal startup states. Persistence or current-session failures stop the shell and offer retry without automatic data reset. Garden-list failure is isolated to the Garden projection and never blocks Focus. Typed native wrappers normalize rejected object, string, and unknown values to a stable frontend error shape; localized Chinese copy is selected by Rust's stable error code, while raw native messages and internal identifiers remain private.
+
 ## Runtime constraints
 
 The formal runtime has no AI API, cloud backend, account, cloud sync, social system, payment, advertising, or telemetry. These are constraints, not merely missing M0 tasks.

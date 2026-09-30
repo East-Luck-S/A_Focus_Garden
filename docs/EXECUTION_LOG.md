@@ -1,5 +1,11 @@
 # Execution Log
 
+## M7 — Chinese Product Shell — CLOSED
+
+- Replaced the English prototype surface with a Chinese-first shell, explicit loading/ready/fatal startup states, retry, localized status/date rendering, and accessible navigation controls.
+- Native wrapper rejections are normalized and stable native error codes map to safe Chinese copy. Data-safety and migration blockers explicitly state that local data is protected and will not be reset automatically.
+- Focus and Garden are separate React projections; Garden reads can fail and retry independently without blocking native-authoritative Focus work. Schema and native business commands remain at version 4.
+
 ## M6 — MVP Transactional Vertical Slice — CLOSED
 
 - Added schema version 4, `004_transactional_plants`, append-only `plants`, exact source/session triggers, immutable receipts, v3 preflight, and post-migration startup reconciliation.
