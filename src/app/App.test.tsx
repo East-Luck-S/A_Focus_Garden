@@ -250,6 +250,12 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "放弃本次专注" }));
     const dialog = screen.getByRole("dialog");
     expect(screen.getByRole("button", { name: "继续专注" })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "确认放弃" })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "继续专注" })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(screen.getByRole("button", { name: "确认放弃" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(abandonFocusSession).not.toHaveBeenCalled();

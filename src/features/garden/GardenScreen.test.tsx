@@ -139,6 +139,8 @@ describe("GardenScreen", () => {
     await settle();
     const dialog = screen.getByRole("dialog");
     expect(screen.getByRole("button", { name: "关闭详情" })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "关闭详情" })).toHaveFocus();
     expect(screen.queryByText("session-id")).not.toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

@@ -1,6 +1,8 @@
-# Focus Garden
+# 专注花园 / Focus Garden
 
-Focus Garden is a Windows-only focus application planned around a simple loop: a focus session drives real-time growth, produces a deterministic plant, and adds it to a persistent garden.
+专注花园是一个 Windows 专注应用：一次专注会驱动植物成长，完成后种下一株可持久保存的确定性植物。当前核心发布候选版本为 **1.0.0-rc.1**，界面与 Windows 安装体验以简体中文为主。
+
+当前本地数据库 schema 为 **v5**：它保留专注会话、确定性植物与种植记录，并保存 1–180 分钟的默认时长设置。花园以本地只读投影视图呈现，不会连接云端或自动重置本机数据。
 
 The project has closed **M7: Chinese Product Shell**. The application is Chinese-first and starts through explicit loading, ready, and data-safe fatal states. A completed focus session is still finalized only by one native SQLite transaction that writes its immutable plant receipt; the Garden remains a read projection of those receipts.
 

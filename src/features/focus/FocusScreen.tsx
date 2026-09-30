@@ -71,6 +71,7 @@ export function FocusScreen({
   const [completedPlant, setCompletedPlant] = useState<GardenPlantDetail | null>(null);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const cancelAbandonRef = useRef<HTMLButtonElement>(null);
+  const abandonTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (session?.status !== "ACTIVE") {
@@ -182,13 +183,28 @@ export function FocusScreen({
   const closeAbandonDialog = () => {
     if (!isBusy) {
       setConfirmAbandon(false);
+      abandonTriggerRef.current?.focus();
     }
   };
 
   const handleDialogKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Tab") {
+      const focusable = Array.from(
+        event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+      );
+      const currentIndex = focusable.indexOf(document.activeElement as HTMLButtonElement);
+      if (currentIndex === -1 || focusable.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      const offset = event.shiftKey ? -1 : 1;
+      const nextIndex = (currentIndex + offset + focusable.length) % focusable.length;
+      focusable[nextIndex]?.focus();
+      return;
+    }
     if (event.key === "Escape" && !isBusy) {
       event.preventDefault();
-      setConfirmAbandon(false);
+      closeAbandonDialog();
     }
   };
 
@@ -315,7 +331,10 @@ export function FocusScreen({
                 className="quiet danger-action"
                 type="button"
                 disabled={isBusy}
-                onClick={() => setConfirmAbandon(true)}
+                onClick={(event) => {
+                  abandonTriggerRef.current = event.currentTarget;
+                  setConfirmAbandon(true);
+                }}
               >
                 放弃本次专注
               </button>
@@ -336,7 +355,10 @@ export function FocusScreen({
                 className="quiet danger-action"
                 type="button"
                 disabled={isBusy}
-                onClick={() => setConfirmAbandon(true)}
+                onClick={(event) => {
+                  abandonTriggerRef.current = event.currentTarget;
+                  setConfirmAbandon(true);
+                }}
               >
                 放弃本次专注
               </button>
@@ -359,7 +381,10 @@ export function FocusScreen({
                 className="quiet danger-action"
                 type="button"
                 disabled={isBusy}
-                onClick={() => setConfirmAbandon(true)}
+                onClick={(event) => {
+                  abandonTriggerRef.current = event.currentTarget;
+                  setConfirmAbandon(true);
+                }}
               >
                 放弃本次专注
               </button>

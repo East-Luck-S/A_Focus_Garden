@@ -1,5 +1,13 @@
 # Execution Log
 
+## M10 — Chinese Windows Release Candidate — CLOSED
+
+- Unified release metadata at version 1.0.0-rc.1. The interface, window title, bundle descriptions, and NSIS installer language are Simplified Chinese; the stable `Focus Garden` package identity and Tauri identifier `com.focusgarden.desktop` are retained for upgrade and data-path continuity. A test with a translated package name produced a side-by-side installation, so that unsafe identity change was reverted before release.
+- Release windows default to 960×720 with a 640×560 minimum. The native Windows caption and border use the page's gray-green palette with dark title text where DWM caption colors are supported. Production CSP permits only local application assets and Tauri IPC, while the separate development CSP contains the Vite localhost and WebSocket allowances.
+- A release-only Windows startup failure retains diagnostic stderr output and shows a stable Chinese MessageBox that does not expose internals or imply an automatic local-data reset. Both product dialogs now trap Tab and Shift+Tab and restore focus on close.
+- Validation: frontend 41 tests; Rust 49 library tests plus 2 release-shell tests; typecheck, lint, production web build, Cargo formatting/check/test/clippy, native development launch, and `npm run tauri build` passed. The release executable is 5,918,208 bytes with SHA-256 `FA9CF42FFDB14ADFD144399A5D6D1A3938DEFA451FE895DEC7554CAC1B03594F`; the NSIS installer is 2,151,531 bytes with SHA-256 `58F385352DA9973C827D6E0E67634A30F8CE678E3280DE80CD4D9B9BF3614A25`. Both carry product version `1.0.0-rc.1` and are unsigned.
+- Upgrade verification installed the historical `Focus Garden 0.1.0` package and then the RC. The corrected stable package identity produced exactly one `1.0.0-rc.1` uninstall entry, one install directory, and one Start Menu shortcut. The separate `com.focusgarden.desktop` database hash was unchanged across install and upgrade. The installed RC launched and restarted successfully; read-only verification after restart found migrations `1,2,3,4,5`, three sessions (one completed, two abandoned, zero open), one plant, no foreign-key violations, and `integrity_check=ok`. M11 has not started.
+
 ## M9 — Core Garden & Local Overview — CLOSED
 
 - Schema remains version 5: M9 adds no migration, table, or index. Rust exposes a bounded keyset Garden page (default 24, maximum 50), explicit plant detail, and a single-query aggregate overview over the existing plant/session relationship.

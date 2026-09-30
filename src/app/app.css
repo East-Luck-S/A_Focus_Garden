@@ -105,6 +105,16 @@ button:disabled { cursor: not-allowed; opacity: .62; transform: none; }
   .garden-plant { height: 11rem; }
 }
 
+@media (max-height: 680px) {
+  .focus-shell { padding-block: .75rem; }
+  .focus-card { padding-block: 1.4rem; }
+  .starter { margin-top: 1.4rem; }
+  .live-plant { height: 11rem; }
+  .completion-card { margin-top: 1rem; padding: 1rem; }
+  .completion-plant { height: 10rem; }
+  .garden-plant { height: 7.5rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }

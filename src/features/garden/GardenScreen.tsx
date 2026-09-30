@@ -130,6 +130,25 @@ export function GardenScreen({ refreshKey }: Props) {
     lastTriggerRef.current?.focus();
   };
 
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Tab") {
+      const focusable = Array.from(
+        event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+      );
+      const currentIndex = focusable.indexOf(document.activeElement as HTMLButtonElement);
+      if (currentIndex === -1 || focusable.length === 0) return;
+      event.preventDefault();
+      const offset = event.shiftKey ? -1 : 1;
+      const nextIndex = (currentIndex + offset + focusable.length) % focusable.length;
+      focusable[nextIndex]?.focus();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDetail();
+    }
+  };
+
   return (
     <section className="session-view garden-view" aria-label="花园">
       <p className="eyebrow">花园</p>
@@ -209,12 +228,7 @@ export function GardenScreen({ refreshKey }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="garden-detail-title"
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                closeDetail();
-              }
-            }}
+            onKeyDown={handleDialogKeyDown}
           >
             <button
               className="quiet detail-close"

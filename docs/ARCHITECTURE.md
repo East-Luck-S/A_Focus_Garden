@@ -76,4 +76,8 @@ M7 keeps Rust commands and the data model unchanged. The React shell has explici
 
 ## Runtime constraints
 
+### M10 Windows release shell
+
+The 1.0.0-rc.1 Windows release candidate uses a Chinese interface, window title, installer language, and bundle descriptions while retaining both the stable `Focus Garden` package identity and Tauri identifier. Keeping the package identity is required for an in-place upgrade from 0.1.0; changing it to the Chinese display name was proven to create a side-by-side installation. The native title bar uses the page's gray-green palette on Windows versions that support DWM caption colors. Production CSP permits only bundled local assets and Tauri IPC; Vite localhost and WebSocket allowances exist only in `devCsp`. A release Windows startup failure emits diagnostics to stderr and separately presents a stable Chinese native message without exposing the error detail or modifying local data.
+
 The formal runtime has no AI API, cloud backend, account, cloud sync, social system, payment, advertising, or telemetry. These are constraints, not merely missing M0 tasks.
