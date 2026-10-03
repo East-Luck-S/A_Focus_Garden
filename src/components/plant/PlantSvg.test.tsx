@@ -208,6 +208,12 @@ describe("buildPlantScene", () => {
 });
 
 describe("PlantSvg", () => {
+  it("is memoized and requires an explicit localized label", () => {
+    const { getByRole } = render(<PlantSvg genome={genome} growth={1} label="测试植物" />);
+    expect((PlantSvg as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for("react.memo"));
+    expect(getByRole("img", { name: "测试植物" })).toBeInTheDocument();
+  });
+
   it("renders a valid labelled SVG image without reusable SVG ids", () => {
     const { container } = render(<PlantSvg genome={genome} growth={1} label="A calm shrub" />);
     const image = screen.getByRole("img", { name: "A calm shrub" });
@@ -228,7 +234,7 @@ describe("PlantSvg", () => {
     ["CLUSTER", "g", "flower-head"],
   ] as const)("renders %s with its own SVG geometry", (kind, tagName, part) => {
     const { container } = render(
-      <PlantSvg genome={{ ...genome, flower: { ...genome.flower, kind } }} growth={1} />,
+      <PlantSvg genome={{ ...genome, flower: { ...genome.flower, kind } }} growth={1} label="测试植物" />,
     );
     const geometry = container.querySelectorAll(`[data-plant-part="${part}"]`);
 
@@ -247,7 +253,7 @@ describe("PlantSvg", () => {
     [0.85, ["stem", "leaf", "dew", "branch", "bud"]],
     [1, ["glow", "stem", "branch", "leaf", "bud", "petal", "flower-center", "dew", "pollen"]],
   ])("uses matching SVG opacity at growth %s", (growth, visibleParts) => {
-    const { container } = render(<PlantSvg genome={genome} growth={growth} />);
+    const { container } = render(<PlantSvg genome={genome} growth={growth} label="测试植物" />);
     const visible = new Set(visibleParts);
     for (const part of ["glow", "stem", "branch", "leaf", "bud", "petal", "flower-center", "dew", "pollen"]) {
       const nodes = container.querySelectorAll(`[data-plant-part="${part}"]`);
@@ -258,5 +264,34 @@ describe("PlantSvg", () => {
         else expect(opacity).toBe(0);
       }
     }
+  });
+
+  it.each([
+    ["SUCCULENT", "rosette-leaf", 0, "0"],
+    ["SUCCULENT", "rosette-leaf", 0.6, "1"],
+    ["VINE", "tendril", 0.6, "0"],
+    ["VINE", "tendril", 0.85, "1"],
+    ["SHRUB", "secondary-stem", 0.6, "0"],
+    ["SHRUB", "secondary-stem", 0.85, "1"],
+  ] as const)("projects %s %s opacity at growth %s", (morphology, part, growth, opacity) => {
+    const { container } = render(
+      <PlantSvg genome={{ ...genome, morphology }} growth={growth} label="测试植物" />,
+    );
+    const nodes = container.querySelectorAll(`[data-plant-part="${part}"]`);
+    expect(nodes.length).toBeGreaterThan(0);
+    expect([...nodes].every((node) => node.getAttribute("opacity") === opacity)).toBe(true);
+  });
+
+  it("grows cluster heads only in the flower stage and keeps the ground shadow bounded", () => {
+    const cluster = { ...genome, flower: { ...genome.flower, kind: "CLUSTER" as const } };
+    const { container, rerender } = render(<PlantSvg genome={cluster} growth={0.85} label="测试植物" />);
+    expect([...container.querySelectorAll('[data-plant-part="flower-head"]')]
+      .every((node) => node.getAttribute("opacity") === "0")).toBe(true);
+    rerender(<PlantSvg genome={cluster} growth={1} label="测试植物" />);
+    expect([...container.querySelectorAll('[data-plant-part="flower-head"]')]
+      .every((node) => node.getAttribute("opacity") === "1")).toBe(true);
+    const shadowOpacity = Number(container.querySelector('[data-plant-part="ground-shadow"]')?.getAttribute("opacity"));
+    expect(shadowOpacity).toBeGreaterThan(0);
+    expect(shadowOpacity).toBeLessThanOrEqual(1);
   });
 });

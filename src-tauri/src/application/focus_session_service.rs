@@ -3,7 +3,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{OptionalExtension, TransactionBehavior};
+use rusqlite::{OptionalExtension, Row, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -126,6 +126,22 @@ pub struct GardenSourceSession {
     pub total_paused_ms: i64,
     pub pause_count: i64,
 }
+
+const GARDEN_FIRST_PAGE_SQL: &str =
+    "SELECT p.id, p.planted_at, p.generator_version, p.plant_genome_json,
+            s.planned_duration_ms, s.pause_count
+     FROM plants p JOIN sessions s ON s.id = p.source_session_id
+     ORDER BY p.planted_at DESC, p.id DESC LIMIT ?1";
+
+const GARDEN_CURSOR_PAGE_SQL: &str =
+    "SELECT p.id, p.planted_at, p.generator_version, p.plant_genome_json,
+            s.planned_duration_ms, s.pause_count
+     FROM plants p JOIN sessions s ON s.id = p.source_session_id
+     WHERE (p.planted_at, p.id) < (?1, ?2)
+     ORDER BY p.planted_at DESC, p.id DESC LIMIT ?3";
+
+const GARDEN_OVERVIEW_SQL: &str = "SELECT COUNT(*), COALESCE(SUM(s.planned_duration_ms), 0)
+     FROM plants p CROSS JOIN sessions s ON s.id = p.source_session_id";
 
 impl FocusSessionService {
     pub fn new(database: Database) -> Self {
@@ -252,49 +268,28 @@ impl FocusSessionService {
             return Err(FocusSessionServiceError::GardenQueryInvalid);
         }
         let connection = self.database.open_connection()?;
-        let mut statement = connection
-            .prepare(
-                "SELECT p.id, p.planted_at, p.generator_version, p.plant_genome_json,
-                        s.planned_duration_ms, s.pause_count
-                 FROM plants p JOIN sessions s ON s.id = p.source_session_id
-                 WHERE (?1 IS NULL) OR p.planted_at < ?1 OR (p.planted_at = ?1 AND p.id < ?2)
-                 ORDER BY p.planted_at DESC, p.id DESC LIMIT ?3",
-            )
-            .map_err(PersistenceError::DatabaseOperation)?;
         let cursor = request.cursor.as_ref();
-        let rows = statement
-            .query_map(
-                rusqlite::params![
-                    cursor.map(|c| c.planted_at),
-                    cursor.map(|c| c.id.as_str()),
-                    request.limit + 1
-                ],
-                |row| {
-                    let genome_json: String = row.get(3)?;
-                    let genome: PlantGenome = serde_json::from_str(&genome_json)
-                        .map_err(|_| rusqlite::Error::InvalidQuery)?;
-                    let generator_version: i64 = row.get(2)?;
-                    let planned_duration: i64 = row.get(4)?;
-                    let pause_count: i64 = row.get(5)?;
-                    if genome.generator_version as i64 != generator_version
-                        || planned_duration <= 0
-                        || pause_count < 0
-                    {
-                        return Err(rusqlite::Error::InvalidQuery);
-                    }
-                    Ok(GardenPlantSummary {
-                        id: row.get(0)?,
-                        planted_at: row.get(1)?,
-                        generator_version,
-                        plant_genome: genome,
-                        source_planned_duration_ms: planned_duration,
-                        source_pause_count: pause_count,
-                    })
-                },
-            )
-            .map_err(PersistenceError::DatabaseOperation)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| FocusSessionServiceError::DataSafetyBlocker)?;
+        let mut statement = connection
+            .prepare(if cursor.is_some() {
+                GARDEN_CURSOR_PAGE_SQL
+            } else {
+                GARDEN_FIRST_PAGE_SQL
+            })
+            .map_err(PersistenceError::DatabaseOperation)?;
+        let rows = match cursor {
+            Some(cursor) => statement
+                .query_map(
+                    rusqlite::params![cursor.planted_at, cursor.id, request.limit + 1],
+                    decode_garden_summary,
+                )
+                .map_err(PersistenceError::DatabaseOperation)?
+                .collect::<Result<Vec<_>, _>>(),
+            None => statement
+                .query_map(rusqlite::params![request.limit + 1], decode_garden_summary)
+                .map_err(PersistenceError::DatabaseOperation)?
+                .collect::<Result<Vec<_>, _>>(),
+        }
+        .map_err(|_| FocusSessionServiceError::DataSafetyBlocker)?;
         let mut items = rows;
         let has_more = items.len() > request.limit as usize;
         if has_more {
@@ -313,7 +308,14 @@ impl FocusSessionService {
 
     pub fn get_garden_overview(&self) -> Result<GardenOverview, FocusSessionServiceError> {
         let connection = self.database.open_connection()?;
-        connection.query_row("SELECT COUNT(*),COALESCE(SUM(s.planned_duration_ms),0) FROM plants p JOIN sessions s ON s.id=p.source_session_id", [], |row| Ok(GardenOverview { plant_count: row.get(0)?, total_planned_duration_ms: row.get(1)? })).map_err(|error| PersistenceError::DatabaseOperation(error).into())
+        connection
+            .query_row(GARDEN_OVERVIEW_SQL, [], |row| {
+                Ok(GardenOverview {
+                    plant_count: row.get(0)?,
+                    total_planned_duration_ms: row.get(1)?,
+                })
+            })
+            .map_err(|error| PersistenceError::DatabaseOperation(error).into())
     }
 
     pub fn get_garden_plant(
@@ -462,6 +464,29 @@ fn bundle_from_session(
     }
 }
 
+fn decode_garden_summary(row: &Row<'_>) -> rusqlite::Result<GardenPlantSummary> {
+    let genome_json: String = row.get(3)?;
+    let genome: PlantGenome =
+        serde_json::from_str(&genome_json).map_err(|_| rusqlite::Error::InvalidQuery)?;
+    let generator_version: i64 = row.get(2)?;
+    let planned_duration: i64 = row.get(4)?;
+    let pause_count: i64 = row.get(5)?;
+    if genome.generator_version as i64 != generator_version
+        || planned_duration <= 0
+        || pause_count < 0
+    {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    Ok(GardenPlantSummary {
+        id: row.get(0)?,
+        planted_at: row.get(1)?,
+        generator_version,
+        plant_genome: genome,
+        source_planned_duration_ms: planned_duration,
+        source_pause_count: pause_count,
+    })
+}
+
 fn read_garden_plant(
     connection: &rusqlite::Connection,
     id: &str,
@@ -572,7 +597,7 @@ mod tests {
 
     use super::{
         test_support::FakeClock, FocusSessionService, FocusSessionServiceError,
-        ListGardenPlantsRequest,
+        ListGardenPlantsRequest, GARDEN_CURSOR_PAGE_SQL, GARDEN_OVERVIEW_SQL,
     };
     use crate::{
         domain::{
@@ -617,6 +642,7 @@ mod tests {
     #[test]
     fn garden_pages_are_keyset_ordered_and_overview_is_exact() {
         let (_directory, clock, service, _database) = service(1_000_000);
+        let plant_count = 240_usize;
         assert!(service
             .list_garden_plants_page(ListGardenPlantsRequest {
                 cursor: None,
@@ -625,7 +651,7 @@ mod tests {
             .unwrap()
             .items
             .is_empty());
-        let ids = seed_completed_plants(&service, &clock, 55);
+        let ids = seed_completed_plants(&service, &clock, plant_count);
         let mut cursor = None;
         let mut collected = Vec::new();
         loop {
@@ -639,23 +665,62 @@ mod tests {
             }
             cursor = page.next_cursor;
         }
-        assert_eq!(collected.len(), 55);
+        assert_eq!(collected.len(), plant_count);
         assert_eq!(
             collected
                 .iter()
                 .collect::<std::collections::HashSet<_>>()
                 .len(),
-            55
+            plant_count
         );
         assert_eq!(collected.first(), ids.last());
         let overview = service.get_garden_overview().unwrap();
-        assert_eq!(overview.plant_count, 55);
+        assert_eq!(overview.plant_count, plant_count as i64);
         assert_eq!(
             overview.total_planned_duration_ms,
-            (0..55)
+            (0..plant_count)
                 .map(|index| 60_000_i64 + (index % 3) as i64 * 60_000)
                 .sum::<i64>()
         );
+    }
+
+    #[test]
+    fn garden_queries_keep_the_existing_indexes_on_their_bounded_paths() {
+        let (_directory, _clock, _service, database) = service(1_000_000);
+        let connection = database.open_connection().unwrap();
+
+        let cursor_plan = connection
+            .prepare(&format!("EXPLAIN QUERY PLAN {GARDEN_CURSOR_PAGE_SQL}"))
+            .unwrap()
+            .query_map(rusqlite::params![1_000_i64, "cursor-id", 25_i64], |row| {
+                row.get::<_, String>(3)
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(cursor_plan
+            .iter()
+            .any(|detail| detail.contains("SEARCH p USING INDEX plants_planted_at_id")));
+        assert!(!cursor_plan
+            .iter()
+            .any(|detail| detail.contains("SCAN p") || detail.contains("TEMP B-TREE")));
+
+        let overview_plan = connection
+            .prepare(&format!("EXPLAIN QUERY PLAN {GARDEN_OVERVIEW_SQL}"))
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(3))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(overview_plan
+            .iter()
+            .any(|detail| detail.starts_with("SCAN p")));
+        assert!(overview_plan
+            .iter()
+            .any(|detail| detail.starts_with("SEARCH s")));
+        assert!(!overview_plan
+            .iter()
+            .any(|detail| detail.starts_with("SCAN s") || detail.contains("TEMP B-TREE")));
     }
 
     #[test]

@@ -103,7 +103,7 @@ describe("GardenScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "重试读取花园" }));
     await settle();
-    expect(screen.getByRole("button", { name: /计划 25 分钟/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /计划 25 分钟/ })).toHaveFocus();
   });
 
   it("appends later pages without duplicate plant cards", async () => {
@@ -121,7 +121,10 @@ describe("GardenScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "加载更多" }));
     await settle();
     expect(listGardenPlants).toHaveBeenLastCalledWith(cursor, 24);
-    expect(screen.getAllByRole("button", { name: /计划 25 分钟/ })).toHaveLength(2);
+    const cards = screen.getAllByRole("button", { name: /计划 25 分钟/ });
+    expect(cards).toHaveLength(2);
+    expect(cards[1]).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("新加载 1 株植物，花园共有 2 株。");
   });
 
   it("opens a friendly detail dialog and restores focus after Escape", async () => {
@@ -140,6 +143,8 @@ describe("GardenScreen", () => {
     const dialog = screen.getByRole("dialog");
     expect(screen.getByRole("button", { name: "关闭详情" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "关闭详情" })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
     expect(screen.getByRole("button", { name: "关闭详情" })).toHaveFocus();
     expect(screen.queryByText("session-id")).not.toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: "Escape" });

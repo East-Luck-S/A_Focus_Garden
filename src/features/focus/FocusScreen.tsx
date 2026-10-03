@@ -48,6 +48,10 @@ function formatRemaining(milliseconds: number): string {
   const remainder = (seconds % 60).toString().padStart(2, "0");
   return `${minutes}:${remainder}`;
 }
+function formatRemainingAccessible(milliseconds: number): string {
+  const seconds = Math.ceil(milliseconds / 1_000);
+  return `剩余专注时间 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+}
 function formatDateTime(milliseconds: number): string {
   return new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
@@ -64,29 +68,45 @@ export function FocusScreen({
 }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
+  const [abandonError, setAbandonError] = useState<string | null>(null);
+  const [durationError, setDurationError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [customMinutes, setCustomMinutes] = useState(
     String(settings.defaultFocusDurationMs / 60_000),
   );
   const [completedPlant, setCompletedPlant] = useState<GardenPlantDetail | null>(null);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
+  const [focusTarget, setFocusTarget] = useState<"PRIMARY" | "STARTER" | "COMPLETION" | null>(null);
   const cancelAbandonRef = useRef<HTMLButtonElement>(null);
   const abandonTriggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const durationInputRef = useRef<HTMLInputElement>(null);
+  const primaryActionRef = useRef<HTMLButtonElement>(null);
+  const completionTitleRef = useRef<HTMLHeadingElement>(null);
+  const recoveryTitleRef = useRef<HTMLHeadingElement>(null);
+  const announcedEndRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (session?.status !== "ACTIVE") {
+    if (session?.status !== "ACTIVE" || projectedRemaining(session, Date.now()) === 0) {
       return;
     }
 
-    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    const interval = window.setInterval(() => {
+      const nextNow = Date.now();
+      setNow(nextNow);
+      if (projectedRemaining(session, nextNow) === 0) {
+        window.clearInterval(interval);
+      }
+    }, 1_000);
     return () => window.clearInterval(interval);
-  }, [session?.status]);
+  }, [session]);
 
   useEffect(() => {
-    if (confirmAbandon) {
-      cancelAbandonRef.current?.focus();
-    }
-  }, [confirmAbandon]);
+    if (!confirmAbandon) return;
+    if (pendingAction === "abandon") dialogRef.current?.focus();
+    else cancelAbandonRef.current?.focus();
+  }, [confirmAbandon, pendingAction]);
 
   const remainingMs = useMemo(
     () => (session ? projectedRemaining(session, now) : 0),
@@ -98,6 +118,30 @@ export function FocusScreen({
   );
   const isBusy = pendingAction !== null;
 
+  useEffect(() => {
+    if (session?.status === "RECOVERY_REQUIRED") recoveryTitleRef.current?.focus();
+  }, [session?.status]);
+
+  useEffect(() => {
+    if (isBusy || !focusTarget) return;
+    const target = focusTarget === "PRIMARY"
+      ? primaryActionRef.current
+      : focusTarget === "STARTER"
+        ? durationInputRef.current
+        : completionTitleRef.current;
+    if (target) {
+      target.focus();
+      setFocusTarget(null);
+    }
+  }, [completedPlant, focusTarget, isBusy, session?.status]);
+
+  useEffect(() => {
+    if (session?.status === "ACTIVE" && remainingMs === 0 && announcedEndRef.current !== session.id) {
+      announcedEndRef.current = session.id;
+      setStatusMessage("专注时间已结束，可以完成并种下植物。");
+    }
+  }, [remainingMs, session]);
+
   const runPending = (action: PendingAction, operation: () => Promise<void>) => {
     if (pendingAction) {
       return;
@@ -105,8 +149,13 @@ export function FocusScreen({
 
     setPendingAction(action);
     setError(null);
+    if (action === "abandon") setAbandonError(null);
     void operation()
-      .catch((reason: unknown) => setError(nativeErrorMessage(reason)))
+      .catch((reason: unknown) => {
+        const message = nativeErrorMessage(reason);
+        if (action === "abandon") setAbandonError(message);
+        else setError(message);
+      })
       .finally(() => setPendingAction(null));
   };
 
@@ -120,6 +169,11 @@ export function FocusScreen({
       setNow(next.observedAt);
       if (next.status === "ABANDONED") {
         setConfirmAbandon(false);
+        setStatusMessage("本次专注已放弃，未生成植物。");
+        setFocusTarget("STARTER");
+      } else {
+        setStatusMessage(next.status === "PAUSED" ? "专注已暂停。" : "专注已继续。");
+        setFocusTarget("PRIMARY");
       }
     });
   };
@@ -127,14 +181,17 @@ export function FocusScreen({
   const validateMinutes = (): number | null => {
     const minutes = Number(customMinutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) {
-      setError("请输入 1 到 180 的整数分钟。");
+      setDurationError("请输入 1 到 180 的整数分钟。");
+      requestAnimationFrame(() => durationInputRef.current?.focus());
       return null;
     }
+    setDurationError(null);
     return minutes;
   };
 
   const choosePreset = (minutes: number) => {
     setCustomMinutes(String(minutes));
+    setDurationError(null);
     runPending("settings", () => onSettingsChange(minutes * 60_000));
   };
 
@@ -152,6 +209,8 @@ export function FocusScreen({
       const next = await startFocusSession(durationMs);
       onSessionChange(next);
       setNow(next.observedAt);
+      setStatusMessage("专注已开始。");
+      setFocusTarget("PRIMARY");
     });
   };
 
@@ -165,6 +224,8 @@ export function FocusScreen({
       onSessionChange(null);
       onPlanted(plant);
       setCompletedPlant(plant);
+      setStatusMessage("专注已完成，植物已经种下。");
+      setFocusTarget("COMPLETION");
     });
   };
 
@@ -183,6 +244,7 @@ export function FocusScreen({
   const closeAbandonDialog = () => {
     if (!isBusy) {
       setConfirmAbandon(false);
+      setAbandonError(null);
       abandonTriggerRef.current?.focus();
     }
   };
@@ -193,10 +255,16 @@ export function FocusScreen({
         event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
       );
       const currentIndex = focusable.indexOf(document.activeElement as HTMLButtonElement);
-      if (currentIndex === -1 || focusable.length === 0) {
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current?.focus();
         return;
       }
       event.preventDefault();
+      if (currentIndex === -1) {
+        (event.shiftKey ? focusable.at(-1) : focusable[0])?.focus();
+        return;
+      }
       const offset = event.shiftKey ? -1 : 1;
       const nextIndex = (currentIndex + offset + focusable.length) % focusable.length;
       focusable[nextIndex]?.focus();
@@ -216,11 +284,14 @@ export function FocusScreen({
         </p>
       )}
 
-      {pendingAction && (
+      {pendingAction && !confirmAbandon && (
         <p className="busy-status" role="status" aria-live="polite">
           正在处理，请稍候…
         </p>
       )}
+      <p className="sr-only" role="status" aria-live="polite">
+        {statusMessage}
+      </p>
 
       {!session && !completedPlant && (
         <div className="starter">
@@ -245,6 +316,7 @@ export function FocusScreen({
             <label htmlFor="custom-duration">自定义时长</label>
             <div className="custom-duration-row">
               <input
+                ref={durationInputRef}
                 id="custom-duration"
                 type="number"
                 inputMode="numeric"
@@ -253,15 +325,21 @@ export function FocusScreen({
                 step="1"
                 value={customMinutes}
                 disabled={isBusy}
-                aria-describedby="duration-help"
-                onChange={(event) => setCustomMinutes(event.target.value)}
+                aria-describedby={durationError ? "duration-help duration-error" : "duration-help"}
+                aria-errormessage={durationError ? "duration-error" : undefined}
+                aria-invalid={durationError ? "true" : undefined}
+                onChange={(event) => {
+                  setCustomMinutes(event.target.value);
+                  setDurationError(null);
+                }}
               />
               <span>分钟</span>
             </div>
             <p id="duration-help">可设置 1–180 分钟，选择会保存为下次默认时长。</p>
+            {durationError ? <p id="duration-error" className="field-error" role="alert">{durationError}</p> : null}
           </div>
 
-          <button className="primary start-button" type="button" disabled={isBusy} onClick={start}>
+          <button ref={primaryActionRef} className="primary start-button" type="button" disabled={isBusy} onClick={start}>
             {pendingAction === "start" ? "正在开始…" : "开始专注"}
           </button>
         </div>
@@ -270,7 +348,7 @@ export function FocusScreen({
       {completedPlant && (
         <article className="completion-card" aria-labelledby="completion-title">
           <p className="eyebrow">本次专注完成</p>
-          <h2 id="completion-title">今天的专注，已经长成一株植物</h2>
+          <h2 ref={completionTitleRef} id="completion-title" tabIndex={-1}>今天的专注，已经长成一株植物</h2>
           <PlantSvg
             genome={completedPlant.plantGenome}
             growth={1}
@@ -295,7 +373,10 @@ export function FocusScreen({
             <button className="primary" type="button" onClick={onOpenGarden}>
               查看花园
             </button>
-            <button className="quiet" type="button" onClick={() => setCompletedPlant(null)}>
+            <button className="quiet" type="button" onClick={() => {
+              setCompletedPlant(null);
+              setFocusTarget("STARTER");
+            }}>
               再专注一次
             </button>
           </div>
@@ -308,16 +389,17 @@ export function FocusScreen({
           <PlantSvg
             genome={session.plantGenome}
             growth={growth}
-            className="live-plant"
+            className={`live-plant ${session.status === "ACTIVE" ? "live-plant-active" : ""}`}
             label={`正在生长的植物，已生长 ${Math.round(growth * 100)}%`}
           />
-          <output className="timer" aria-label="剩余专注时间">
+          <output className="timer" role="timer" aria-live="off" aria-label={formatRemainingAccessible(remainingMs)}>
             {formatRemaining(remainingMs)}
           </output>
 
           {session.status === "ACTIVE" && remainingMs > 0 && (
             <div className="actions">
               <button
+                ref={primaryActionRef}
                 className="primary"
                 type="button"
                 disabled={isBusy}
@@ -344,6 +426,7 @@ export function FocusScreen({
           {session.status === "ACTIVE" && remainingMs === 0 && (
             <div className="actions">
               <button
+                ref={primaryActionRef}
                 className="primary"
                 type="button"
                 disabled={isBusy}
@@ -368,6 +451,7 @@ export function FocusScreen({
           {session.status === "PAUSED" && (
             <div className="actions">
               <button
+                ref={primaryActionRef}
                 className="primary"
                 type="button"
                 disabled={isBusy}
@@ -393,13 +477,14 @@ export function FocusScreen({
 
           {session.status === "RECOVERY_REQUIRED" && (
             <div className="recovery">
-              <h2>上次专注需要你来决定</h2>
+              <h2 ref={recoveryTitleRef} tabIndex={-1}>上次专注需要你来决定</h2>
               <p>
                 继续会沿用原结束时间；离开期间不会自动奖励植物。如果计时已经到点，
                 继续后即可由你确认完成。放弃则不会获得植物。
               </p>
               <div className="actions">
                 <button
+                  ref={primaryActionRef}
                   className="primary"
                   type="button"
                   disabled={isBusy}
@@ -415,7 +500,10 @@ export function FocusScreen({
                   className="quiet danger-action"
                   type="button"
                   disabled={isBusy}
-                  onClick={() => setConfirmAbandon(true)}
+                  onClick={(event) => {
+                    abandonTriggerRef.current = event.currentTarget;
+                    setConfirmAbandon(true);
+                  }}
                 >
                   放弃本次专注
                 </button>
@@ -428,9 +516,12 @@ export function FocusScreen({
       {confirmAbandon && session && (
         <div className="dialog-backdrop">
           <section
+            ref={dialogRef}
             className="confirm-dialog"
             role="dialog"
+            tabIndex={-1}
             aria-modal="true"
+            aria-busy={pendingAction === "abandon"}
             aria-labelledby="abandon-title"
             aria-describedby="abandon-description"
             onKeyDown={handleDialogKeyDown}
@@ -440,6 +531,10 @@ export function FocusScreen({
             <p id="abandon-description">
               当前进度会保存为“已放弃”，但不会获得植物。这个操作不能恢复。
             </p>
+            {pendingAction === "abandon" ? (
+              <p className="busy-status" role="status" aria-live="polite">正在放弃，请稍候…</p>
+            ) : null}
+            {abandonError ? <p className="notice" role="alert">{abandonError}</p> : null}
             <div className="actions">
               <button
                 ref={cancelAbandonRef}
@@ -448,7 +543,7 @@ export function FocusScreen({
                 disabled={isBusy}
                 onClick={closeAbandonDialog}
               >
-                继续专注
+                返回，不放弃
               </button>
               <button
                 className="quiet danger-action"

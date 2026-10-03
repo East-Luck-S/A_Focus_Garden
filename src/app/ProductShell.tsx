@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FocusScreen } from "../features/focus/FocusScreen";
 import { GardenScreen } from "../features/garden/GardenScreen";
@@ -22,6 +22,8 @@ export function ProductShell() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [gardenRevision, setGardenRevision] = useState(0);
   const [view, setView] = useState<View>("FOCUS");
+  const focusAfterRetryRef = useRef(false);
+  const appTitleRef = useRef<HTMLHeadingElement>(null);
 
   const loadCore = useCallback(
     async () =>
@@ -36,6 +38,7 @@ export function ProductShell() {
   const retryBoot = () => {
     setBoot("LOADING");
     setFatal(null);
+    focusAfterRetryRef.current = true;
     void loadCore()
       .then(([, nextSession, nextSettings]) => {
         setSession(nextSession);
@@ -60,6 +63,13 @@ export function ProductShell() {
         setBoot("FATAL");
       });
   }, [loadCore]);
+
+  useEffect(() => {
+    if (boot === "READY" && focusAfterRetryRef.current) {
+      focusAfterRetryRef.current = false;
+      appTitleRef.current?.focus();
+    }
+  }, [boot]);
 
   const handlePlanted = () => {
     setGardenRevision((current) => current + 1);
@@ -109,7 +119,7 @@ export function ProductShell() {
         <header className="app-header">
           <div>
             <p className="eyebrow">专注花园 / Focus Garden</p>
-            <h1 id="app-title">专注花园</h1>
+            <h1 ref={appTitleRef} id="app-title" tabIndex={-1}>专注花园</h1>
           </div>
           <nav className="main-nav" aria-label="主导航">
             <button

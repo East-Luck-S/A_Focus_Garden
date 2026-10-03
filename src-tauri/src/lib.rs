@@ -27,10 +27,11 @@ fn apply_windows_caption_colors(window: &tauri::WebviewWindow) {
     let Ok(hwnd) = window.hwnd() else {
         return;
     };
+    let (caption, text, border) = caption_colors(windows_high_contrast_enabled());
     for (attribute, color) in [
-        (DWMWA_CAPTION_COLOR, WINDOW_CAPTION_COLOR),
-        (DWMWA_TEXT_COLOR, WINDOW_TEXT_COLOR),
-        (DWMWA_BORDER_COLOR, WINDOW_CAPTION_COLOR),
+        (DWMWA_CAPTION_COLOR, caption),
+        (DWMWA_TEXT_COLOR, text),
+        (DWMWA_BORDER_COLOR, border),
     ] {
         // DWM appearance is optional; an unsupported Windows version must not block startup.
         unsafe {
@@ -44,6 +45,47 @@ fn apply_windows_caption_colors(window: &tauri::WebviewWindow) {
     }
 }
 
+#[cfg(windows)]
+fn windows_high_contrast_enabled() -> bool {
+    use windows_sys::Win32::UI::{
+        Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW},
+        WindowsAndMessaging::{SystemParametersInfoW, SPI_GETHIGHCONTRAST},
+    };
+
+    let mut setting = HIGHCONTRASTW {
+        cbSize: size_of::<HIGHCONTRASTW>() as u32,
+        ..Default::default()
+    };
+    let succeeded = unsafe {
+        SystemParametersInfoW(
+            SPI_GETHIGHCONTRAST,
+            setting.cbSize,
+            &mut setting as *mut HIGHCONTRASTW as *mut core::ffi::c_void,
+            0,
+        )
+    };
+    succeeded != 0 && setting.dwFlags & HCF_HIGHCONTRASTON != 0
+}
+
+#[cfg(windows)]
+fn caption_colors(high_contrast: bool) -> (u32, u32, u32) {
+    use windows_sys::Win32::Graphics::Dwm::DWMWA_COLOR_DEFAULT;
+
+    if high_contrast {
+        (
+            DWMWA_COLOR_DEFAULT,
+            DWMWA_COLOR_DEFAULT,
+            DWMWA_COLOR_DEFAULT,
+        )
+    } else {
+        (
+            WINDOW_CAPTION_COLOR,
+            WINDOW_TEXT_COLOR,
+            WINDOW_CAPTION_COLOR,
+        )
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<(), AppError> {
     tauri::Builder::default()
@@ -51,6 +93,15 @@ pub fn run() -> Result<(), AppError> {
             #[cfg(windows)]
             if let Some(window) = app.get_webview_window("main") {
                 apply_windows_caption_colors(&window);
+                let event_window = window.clone();
+                window.on_window_event(move |event| {
+                    if matches!(
+                        event,
+                        tauri::WindowEvent::Focused(true) | tauri::WindowEvent::ThemeChanged(_)
+                    ) {
+                        apply_windows_caption_colors(&event_window);
+                    }
+                });
             }
             let app_local_data_dir = app
                 .path()
@@ -84,11 +135,32 @@ pub fn run() -> Result<(), AppError> {
 
 #[cfg(test)]
 mod tests {
-    use super::colorref;
+    use super::{caption_colors, colorref, WINDOW_CAPTION_COLOR, WINDOW_TEXT_COLOR};
+    use windows_sys::Win32::Graphics::Dwm::DWMWA_COLOR_DEFAULT;
 
     #[test]
     fn colorref_uses_windows_bgr_byte_order() {
         assert_eq!(colorref(0xd8, 0xdd, 0xd1), 0x00d1ddd8);
         assert_eq!(colorref(0x37, 0x48, 0x3f), 0x003f4837);
+    }
+
+    #[test]
+    fn caption_colors_defer_to_windows_in_high_contrast() {
+        assert_eq!(
+            caption_colors(false),
+            (
+                WINDOW_CAPTION_COLOR,
+                WINDOW_TEXT_COLOR,
+                WINDOW_CAPTION_COLOR
+            )
+        );
+        assert_eq!(
+            caption_colors(true),
+            (
+                DWMWA_COLOR_DEFAULT,
+                DWMWA_COLOR_DEFAULT,
+                DWMWA_COLOR_DEFAULT
+            )
+        );
     }
 }

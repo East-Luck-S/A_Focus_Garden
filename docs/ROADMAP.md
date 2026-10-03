@@ -1,6 +1,6 @@
 # Roadmap
 
-M11 is closed. M12 is active; Plant Visual System V1.1 remains renderer-only over persisted V1 genomes.
+M12 is closed. M13 is active; the product is now in release hardening with schema version 5 and generator version 1 unchanged.
 
 1. **M0 — Repository Foundation & Windows Native Baseline**
 2. **M1 — Persistence & Native Boundary Foundation**
@@ -14,8 +14,8 @@ M11 is closed. M12 is active; Plant Visual System V1.1 remains renderer-only ove
 10. **M9 — Core Garden & Local Overview** — CLOSED
 11. **M10 — Chinese Windows Release Candidate** — CLOSED
 12. **M11 — Plant System Expansion & Visual Quality** — CLOSED
-13. **M12 — UX / Accessibility / Performance Hardening** — ACTIVE
-14. **M13 — Release Hardening**
+13. **M12 — UX / Accessibility / Performance Hardening** — CLOSED
+14. **M13 — Release Hardening** — ACTIVE
 15. **V1.0 — Windows Release**
 
-This roadmap names scope. M7 established the Chinese-first shell, M8 established formal duration settings and focus-flow interaction, M9 established the local Garden overview, M10 established the 1.0.0-rc.1 Windows release candidate, and M11 expanded visual expression without changing persisted V1 genomes. M12 is active; M13 and V1.0 remain deferred until their preceding gates pass.
+This roadmap names scope. M7 established the Chinese-first shell, M8 established formal duration settings and focus-flow interaction, M9 established the local Garden overview, M10 established the 1.0.0-rc.1 Windows release candidate, M11 expanded visual expression without changing persisted V1 genomes, and M12 hardened keyboard interaction, accessibility, and bounded read performance. M13 is active; V1.0 remains deferred until its release and human acceptance gates pass.

@@ -1,5 +1,14 @@
 # Execution Log
 
+## M12 — UX / Accessibility / Performance Hardening — CLOSED
+
+- Hardened the Chinese Focus flow around stable focus placement, explicit duration validation, meaningful state announcements, and a fully contained abandonment dialog. The wall-clock projection interval exists only while an active session has time remaining and clears itself at zero; paused and recovery previews remain static. Garden entry, retry, pagination exhaustion, and detail-dialog close all preserve a predictable keyboard focus target.
+- Improved the existing visual system without changing domain truth: `PlantSvg` requires a Chinese accessible label and is memoized for static Garden cards, while live animation is restricted to active Focus plants. Contrast, forced-colors, reduced-motion, high zoom, and short-window layouts now have explicit presentation rules.
+- Reworked the existing Garden reads without a schema change. Cursor pages use the existing `(planted_at, id)` index as a row-value range seek, and the overview is deliberately plants-driven before its indexed session lookup. A 240-plant service test covers ten pages, ordering, uniqueness, and exact overview totals; bundled SQLite query-plan assertions prevent full plant/session scans and temporary sorts on the bounded paths.
+- On Windows, the normal gray-green caption remains in place, while system High Contrast selects DWM default caption, text, and border colors. The policy is refreshed on theme changes and when the window regains focus.
+- Validation: frontend typecheck, lint, production build, and 64 tests passed. Cargo formatting, check, clippy with warnings denied, 51 library tests, and 2 release-shell tests passed. A native development executable compiled and launched successfully. Read-only verification of the application database found migrations `1,2,3,4,5`, four sessions (two completed, two abandoned, zero open), two plants, zero receipt mismatches, and `integrity_check=ok`.
+- Schema remains version 5; the migration chain, generator version 1, immutable generation receipts, and Cargo lockfile are unchanged. The current computer-control surface did not expose native Windows applications, so manual Narrator, operating-system High Contrast switching, and 200% display-scaling interaction remain explicit human/M13 acceptance items rather than claimed evidence.
+
 ## M11 — Plant System Expansion & Visual Quality — CLOSED
 
 - Delivered Plant Visual System V1.1 as a renderer-only expansion. The five persisted morphologies now project into different structures: fern fronds, a low succulent rosette, an open wildflower, vine tendrils, and a branched shrub canopy. Oval, lanceolate, serrated, and round leaves have distinct paths; bloom, bell, star, and cluster flowers use distinct SVG geometry.

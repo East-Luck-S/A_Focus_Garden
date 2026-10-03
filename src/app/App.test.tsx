@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -12,6 +12,7 @@ import {
   listGardenPlants,
   pauseFocusSession,
   resolveFocusSessionRecovery,
+  resumeFocusSession,
   startFocusSession,
   type FocusSessionSnapshot,
 } from "../shared/native";
@@ -86,17 +87,60 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
     expect(screen.queryByText("ACTIVE")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "暂停" })).toBeInTheDocument();
-    expect(screen.getByLabelText("剩余专注时间")).toBeInTheDocument();
+    expect(screen.getByRole("timer", { name: /剩余专注时间/ })).toHaveAttribute("aria-live", "off");
   });
 
   it("uses an interval only to refresh the active projection", async () => {
     vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
     render(<App />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(screen.getByLabelText("剩余专注时间")).toHaveTextContent("01:00");
+    expect(screen.getByRole("timer", { name: /剩余专注时间/ })).toHaveTextContent("01:00");
     await act(async () => { vi.advanceTimersByTime(1_000); });
-    expect(screen.getByLabelText("剩余专注时间")).toHaveTextContent("00:59");
+    expect(screen.getByRole("timer", { name: /剩余专注时间/ })).toHaveTextContent("00:59");
     expect(pauseFocusSession).not.toHaveBeenCalled();
+  });
+
+  it("stops the projection timer at zero without polling native state", async () => {
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    const callsBefore = {
+      current: vi.mocked(getCurrentFocusSession).mock.calls.length,
+      persistence: vi.mocked(getPersistenceStatus).mock.calls.length,
+      settings: vi.mocked(getAppSettings).mock.calls.length,
+    };
+    expect(vi.getTimerCount()).toBe(1);
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+
+    expect(screen.getByRole("timer", { name: "剩余专注时间 0 分 0 秒" })).toHaveTextContent("00:00");
+    expect(screen.getByRole("button", { name: "完成专注并种下" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("专注时间已结束，可以完成并种下植物。");
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => { vi.advanceTimersByTime(10_000); });
+    expect(vi.mocked(getCurrentFocusSession)).toHaveBeenCalledTimes(callsBefore.current);
+    expect(vi.mocked(getPersistenceStatus)).toHaveBeenCalledTimes(callsBefore.persistence);
+    expect(vi.mocked(getAppSettings)).toHaveBeenCalledTimes(callsBefore.settings);
+    expect(pauseFocusSession).not.toHaveBeenCalled();
+    expect(finalizeFocusSession).not.toHaveBeenCalled();
+  });
+
+  it("moves focus to the next primary action after pause and resume", async () => {
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
+    vi.mocked(pauseFocusSession).mockResolvedValue(session("PAUSED"));
+    vi.mocked(resumeFocusSession).mockResolvedValue(session("ACTIVE"));
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    fireEvent.click(screen.getByRole("button", { name: "暂停" }));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole("button", { name: "继续专注" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("专注已暂停。");
+
+    fireEvent.click(screen.getByRole("button", { name: "继续专注" }));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole("button", { name: "暂停" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("专注已继续。");
   });
 
   it("guards a pending pause and keeps the active session retryable after failure", async () => {
@@ -133,6 +177,16 @@ describe("App", () => {
     expect(projectedRemaining(session("RECOVERY_REQUIRED"), 99_000)).toBe(60_000);
   });
 
+  it.each(["PAUSED", "RECOVERY_REQUIRED"] as const)("does not animate or schedule projection ticks while %s", async (status) => {
+    const intervalSpy = vi.spyOn(window, "setInterval");
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(session(status));
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(intervalSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("img", { name: /正在生长的植物/ })).not.toHaveClass("live-plant-active");
+    intervalSpy.mockRestore();
+  });
+
   it("returns to duration selection after abandoning an active session", async () => {
     vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
     vi.mocked(abandonFocusSession).mockResolvedValue(session("ABANDONED"));
@@ -144,6 +198,7 @@ describe("App", () => {
     await act(async () => { await Promise.resolve(); });
     expect(abandonFocusSession).toHaveBeenCalledWith("session-id");
     expect(screen.getByRole("button", { name: "25分钟" })).toBeInTheDocument();
+    expect(screen.getByLabelText("自定义时长")).toHaveFocus();
   });
 
   it("returns to duration selection after abandoning a recovery session", async () => {
@@ -169,7 +224,7 @@ describe("App", () => {
     fireEvent.click(finish); fireEvent.click(finish);
     await act(async () => { await Promise.resolve(); });
     expect(finalizeFocusSession).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("heading", { name: "今天的专注，已经长成一株植物" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "今天的专注，已经长成一株植物" })).toHaveFocus();
     expect(screen.getByText("计划时长")).toBeInTheDocument();
     expect(screen.getByText("暂停次数")).toBeInTheDocument();
     expect(screen.getByText("种下时间")).toBeInTheDocument();
@@ -189,6 +244,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.getByRole("button", { name: "25分钟" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "专注花园" })).toHaveFocus();
   });
 
   it("loads Garden only after navigation, without blocking Focus when the request fails", async () => {
@@ -243,22 +299,91 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "暂停" })).toBeInTheDocument();
   });
 
-  it("opens abandon confirmation with focus on continue and Escape closes without a native call", async () => {
+  it("opens abandon confirmation with focus on return and Escape closes without a native call", async () => {
     vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
     render(<App />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     fireEvent.click(screen.getByRole("button", { name: "放弃本次专注" }));
     const dialog = screen.getByRole("dialog");
-    expect(screen.getByRole("button", { name: "继续专注" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "返回，不放弃" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Tab" });
     expect(screen.getByRole("button", { name: "确认放弃" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(screen.getByRole("button", { name: "继续专注" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "返回，不放弃" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
     expect(screen.getByRole("button", { name: "确认放弃" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(abandonFocusSession).not.toHaveBeenCalled();
+  });
+
+  it("restores the recovery abandon trigger and traps focus while abandonment is pending", async () => {
+    const pendingAbandon = deferred<FocusSessionSnapshot>();
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(session("RECOVERY_REQUIRED"));
+    vi.mocked(resolveFocusSessionRecovery).mockReturnValueOnce(pendingAbandon.promise);
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    const trigger = screen.getByRole("button", { name: "放弃本次专注" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "返回，不放弃" }));
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "确认放弃" }));
+    await act(async () => { await Promise.resolve(); });
+    expect(dialog).toHaveAttribute("aria-busy", "true");
+    expect(dialog).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(dialog).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(dialog).toHaveFocus();
+
+    await act(async () => {
+      pendingAbandon.resolve(session("ABANDONED"));
+      await Promise.resolve();
+    });
+    expect(screen.getByLabelText("自定义时长")).toHaveFocus();
+  });
+
+  it("keeps abandonment failures visible and actionable inside the dialog", async () => {
+    const pendingAbandon = deferred<FocusSessionSnapshot>();
+    vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
+    vi.mocked(abandonFocusSession).mockReturnValueOnce(pendingAbandon.promise);
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    fireEvent.click(screen.getByRole("button", { name: "放弃本次专注" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认放弃" }));
+    expect(within(dialog).getByRole("status")).toHaveTextContent("正在放弃，请稍候…");
+
+    await act(async () => {
+      pendingAbandon.reject({ code: "DATABASE_OPERATION_FAILURE" });
+      await Promise.resolve();
+    });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("操作暂时无法完成");
+    expect(within(dialog).getByRole("button", { name: "返回，不放弃" })).toHaveFocus();
+    expect(screen.queryByRole("alert", { hidden: false })).toBe(within(dialog).getByRole("alert"));
+  });
+
+  it("associates duration validation with the input and clears it while editing", async () => {
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const input = screen.getByLabelText("自定义时长");
+
+    fireEvent.change(input, { target: { value: "181" } });
+    fireEvent.click(screen.getByRole("button", { name: "开始专注" }));
+    await act(async () => { vi.runOnlyPendingTimers(); });
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-errormessage", "duration-error");
+    expect(input).toHaveAccessibleDescription(/1–180|1 到 180/);
+
+    fireEvent.change(input, { target: { value: "30" } });
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByText("请输入 1 到 180 的整数分钟。")).not.toBeInTheDocument();
   });
 
   it("explains recovery consequences before confirmation", async () => {

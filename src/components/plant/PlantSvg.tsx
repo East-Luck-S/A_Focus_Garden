@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 
 import type { PlantGenome } from "../../shared/plant";
 
@@ -7,7 +7,7 @@ import { buildLeafPath, buildPlantScene, type ScenePetal } from "./plant-scene";
 export type PlantSvgProps = {
   genome: PlantGenome;
   growth: number;
-  label?: string;
+  label: string;
   className?: string;
 };
 
@@ -21,14 +21,13 @@ function petalPoints(petal: ScenePetal, scale: number): string {
 }
 
 /** A pure presentation of a Rust-authoritative PlantGenome and supplied growth. */
-export function PlantSvg({ genome, growth, label, className }: PlantSvgProps) {
+export const PlantSvg = memo(function PlantSvg({ genome, growth, label, className }: PlantSvgProps) {
   const titleId = useId();
   const scene = useMemo(() => buildPlantScene(genome, growth), [genome, growth]);
-  const accessibleLabel = label ?? `${scene.morphology.toLowerCase()} plant, ${scene.stage.toLowerCase()} growth stage`;
 
   return (
     <svg className={className} viewBox={scene.viewBox} role="img" aria-labelledby={titleId} data-growth-stage={scene.stage} data-morphology={scene.morphology} data-flower-kind={genome.flower.kind}>
-      <title id={titleId}>{accessibleLabel}</title>
+      <title id={titleId}>{label}</title>
       <g data-plant-part="glow" opacity={scene.glow * 0.24} aria-hidden="true">
         <circle cx={scene.flowerCenter.cx} cy={scene.flowerCenter.cy} r={scene.flowerCenter.radius * (2 + scene.glow)} fill={scene.flowerCenter.fill} />
       </g>
@@ -63,4 +62,4 @@ export function PlantSvg({ genome, growth, label, className }: PlantSvgProps) {
       {scene.pollen.map((grain) => <circle data-plant-part="pollen" key={grain.key} cx={grain.cx} cy={grain.cy} r={grain.radius} fill={grain.fill} opacity={grain.opacity} />)}
     </svg>
   );
-}
+});

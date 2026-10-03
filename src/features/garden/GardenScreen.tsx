@@ -17,12 +17,15 @@ type Props = { refreshKey: number };
 
 const PAGE_SIZE = 24;
 type FailedGardenRequest = "FIRST_PAGE" | "MORE" | null;
+type GardenFocusRequest = "TITLE" | string | null;
+
+const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 function dateTime(value: number): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return dateTimeFormatter.format(new Date(value));
 }
 
 function minutes(value: number): string {
@@ -48,8 +51,16 @@ export function GardenScreen({ refreshKey }: Props) {
   const [selected, setSelected] = useState<GardenPlantDetail | null>(null);
   const [detailError, setDetailError] = useState<unknown>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [focusRequest, setFocusRequest] = useState<GardenFocusRequest>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const lastTriggerRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
 
   const loadFirstPage = () => {
     setLoading(true);
@@ -60,6 +71,8 @@ export function GardenScreen({ refreshKey }: Props) {
         setPlants(page.items);
         setNextCursor(page.nextCursor);
         setOverview(nextOverview);
+        setStatusMessage(`花园已加载 ${page.items.length} 株植物。`);
+        setFocusRequest(page.items[0]?.id ?? "TITLE");
       })
       .catch((reason: unknown) => {
         setError(reason);
@@ -76,6 +89,7 @@ export function GardenScreen({ refreshKey }: Props) {
         setPlants(page.items);
         setNextCursor(page.nextCursor);
         setOverview(nextOverview);
+        setStatusMessage(`花园已加载 ${page.items.length} 株植物。`);
       })
       .catch((reason: unknown) => {
         if (current) {
@@ -97,6 +111,15 @@ export function GardenScreen({ refreshKey }: Props) {
     }
   }, [selected]);
 
+  useEffect(() => {
+    if (!focusRequest) return;
+    const target = focusRequest === "TITLE" ? titleRef.current : cardRefs.current.get(focusRequest);
+    if (target) {
+      target.focus();
+      setFocusRequest(null);
+    }
+  }, [focusRequest, plants]);
+
   const loadMore = () => {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -104,8 +127,12 @@ export function GardenScreen({ refreshKey }: Props) {
     setFailedRequest(null);
     void listGardenPlants(nextCursor, PAGE_SIZE)
       .then((page) => {
-        setPlants((current) => appendUnique(current, page.items));
+        const merged = appendUnique(plants, page.items);
+        const firstAdded = merged[plants.length];
+        setPlants(merged);
         setNextCursor(page.nextCursor);
+        setStatusMessage(`新加载 ${merged.length - plants.length} 株植物，花园共有 ${merged.length} 株。`);
+        if (!page.nextCursor) setFocusRequest(firstAdded?.id ?? plants.at(-1)?.id ?? "TITLE");
       })
       .catch((reason: unknown) => {
         setError(reason);
@@ -136,11 +163,15 @@ export function GardenScreen({ refreshKey }: Props) {
         event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
       );
       const currentIndex = focusable.indexOf(document.activeElement as HTMLButtonElement);
-      if (currentIndex === -1 || focusable.length === 0) return;
+      if (focusable.length === 0) return;
       event.preventDefault();
       const offset = event.shiftKey ? -1 : 1;
       const nextIndex = (currentIndex + offset + focusable.length) % focusable.length;
-      focusable[nextIndex]?.focus();
+      if (currentIndex === -1) {
+        (event.shiftKey ? focusable.at(-1) : focusable[0])?.focus();
+      } else {
+        focusable[nextIndex]?.focus();
+      }
       return;
     }
     if (event.key === "Escape") {
@@ -152,7 +183,9 @@ export function GardenScreen({ refreshKey }: Props) {
   return (
     <section className="session-view garden-view" aria-label="花园">
       <p className="eyebrow">花园</p>
-      <h2>你的专注花园</h2>
+      <h2 ref={titleRef} tabIndex={-1}>你的专注花园</h2>
+
+      <p className="sr-only" role="status" aria-live="polite">{statusMessage}</p>
 
       {loading ? <p aria-live="polite">正在整理花园…</p> : null}
 
@@ -191,6 +224,10 @@ export function GardenScreen({ refreshKey }: Props) {
         <div className="garden-grid" aria-label="已种下的植物">
           {plants.map((plant) => (
             <button
+              ref={(node) => {
+                if (node) cardRefs.current.set(plant.id, node);
+                else cardRefs.current.delete(plant.id);
+              }}
               className="garden-plant-card"
               key={plant.id}
               type="button"
