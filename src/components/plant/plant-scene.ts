@@ -49,6 +49,27 @@ export type ScenePetal = {
   progress: number;
 };
 
+export type SceneFlowerHead = {
+  key: string;
+  cx: number;
+  cy: number;
+  radius: number;
+  fill: string;
+  accent: string;
+  opacity: number;
+  progress: number;
+};
+
+export type SceneEllipse = {
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  fill: string;
+  opacity: number;
+  progress: number;
+};
+
 export type PlantScene = {
   viewBox: string;
   growth: number;
@@ -57,13 +78,18 @@ export type PlantScene = {
   seed: SceneDot;
   stem: ScenePath;
   branches: readonly ScenePath[];
+  secondaryStems: readonly ScenePath[];
+  tendrils: readonly ScenePath[];
   leaves: readonly SceneLeaf[];
+  rosetteLeaves: readonly SceneLeaf[];
   buds: readonly SceneDot[];
   petals: readonly ScenePetal[];
+  flowerHeads: readonly SceneFlowerHead[];
   flowerCenter: SceneDot;
   dewDrops: readonly SceneDot[];
   pollen: readonly SceneDot[];
   glow: number;
+  groundShadow: SceneEllipse;
 };
 
 const BASE_X = 120;
@@ -98,6 +124,19 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Returns the deterministic SVG outline for one projected leaf. */
+export function buildLeafPath(leaf: SceneLeaf): string {
+  if (leaf.shape === "ROUND") {
+    return `M 0 0 C ${leaf.size * 0.18} ${-leaf.size * 0.48}, ${leaf.size * 0.7} ${-leaf.size * 0.48}, ${leaf.size * 0.72} 0 C ${leaf.size * 0.7} ${leaf.size * 0.48}, ${leaf.size * 0.18} ${leaf.size * 0.48}, 0 0 Z`;
+  }
+  const width = leaf.size * (leaf.shape === "LANCEOLATE" ? 0.2 : 0.3);
+  const length = leaf.size * (leaf.shape === "LANCEOLATE" ? 0.78 : 0.58);
+  if (leaf.shape === "SERRATED") {
+    return `M 0 0 L ${length * 0.2} ${-width * 0.55} L ${length * 0.36} ${-width} L ${length * 0.52} ${-width * 0.48} L ${length * 0.7} ${-width * 0.82} L ${length} 0 L ${length * 0.7} ${width * 0.82} L ${length * 0.52} ${width * 0.48} L ${length * 0.36} ${width} L ${length * 0.2} ${width * 0.55} Z`;
+  }
+  return `M 0 0 C ${length * 0.35} ${-width}, ${length * 0.84} ${-width}, ${length} 0 C ${length * 0.84} ${width}, ${length * 0.35} ${width}, 0 0 Z`;
+}
+
 function stemPoint(t: number, height: number, curvature: number, breeze: number): { x: number; y: number } {
   const drift = curvature * t * t + breeze * t * 0.18;
   return { x: round(BASE_X + drift), y: round(BASE_Y - height * t) };
@@ -128,7 +167,8 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
   const leafProgress = reveal(growth, 0.35, 0.6);
   const branchProgress = reveal(growth, 0.6, 0.85);
   const flowerProgress = reveal(growth, 0.85, 1);
-  const height = 64 + genome.stem.height * 1.18;
+  const fullHeight = 64 + genome.stem.height * 1.18;
+  const height = genome.morphology === "SUCCULENT" ? Math.min(58, fullHeight * 0.38) : fullHeight;
   const curvature = genome.stem.curvature * (genome.morphology === "VINE" ? 1.45 : 0.92);
   const breeze = genome.effects.breeze_offset;
   const top = stemPoint(1, height, curvature, breeze);
@@ -148,17 +188,17 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
     progress: stemProgress,
   };
 
-  const leaves = genome.leaves.map((leaf, index) => {
+  const leaves = (genome.morphology === "SUCCULENT" ? [] : genome.leaves).flatMap((leaf, index) => {
     const t = Math.min(0.92, Math.max(0.12, leaf.position / 100));
     const anchor = stemPoint(t, height, curvature, breeze);
     const side = leaf.side === "LEFT" ? -1 : 1;
-    const size = leaf.size * leafScale(genome.morphology);
+    const size = leaf.size * leafScale(genome.morphology) * (genome.morphology === "FERN" ? 0.86 + (index % 3) * 0.08 : 1);
     const angle = leaf.angle_degrees + (genome.morphology === "FERN" ? side * 10 : 0);
-    const reach = size * (genome.morphology === "FERN" ? 0.5 : 0.39);
-    return {
+    const reach = size * (genome.morphology === "FERN" ? 0.82 : 0.39);
+    const projected = {
       key: `${scenePrefix}-leaf-${index}-${leaf.shape.toLowerCase()}`,
       cx: round(anchor.x + side * reach),
-      cy: round(anchor.y - size * 0.07),
+      cy: round(anchor.y - size * (genome.morphology === "FERN" ? 0.18 + (index % 2) * 0.08 : 0.07)),
       size: round(size),
       angle,
       shape: leaf.shape,
@@ -167,6 +207,22 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
       opacity: leafProgress,
       progress: leafProgress,
     } satisfies SceneLeaf;
+    if (genome.morphology !== "FERN") return [projected];
+    return [0, 1, 2].map((segment) => {
+      const leafletSide = segment === 0 ? -1 : segment === 1 ? 1 : side;
+      const leafletT = Math.min(0.94, Math.max(0.1, t + (segment === 2 ? 0.045 : -0.012)));
+      const leafletAnchor = stemPoint(leafletT, height, curvature, breeze);
+      const leafletSize = size * (segment === 2 ? 0.58 : 0.76);
+      const leafletReach = leafletSize * (segment === 2 ? 0.5 : 0.82);
+      return {
+        ...projected,
+        key: `${projected.key}-frond-${segment}`,
+        cx: round(leafletAnchor.x + leafletSide * leafletReach),
+        cy: round(leafletAnchor.y - leafletSize * 0.08),
+        size: round(leafletSize),
+        angle: leafletSide * (Math.abs(leaf.angle_degrees) + (segment === 2 ? 4 : 12)),
+      };
+    });
   });
 
   const branchProjection = Array.from({ length: genome.stem.branch_count }, (_, index) => {
@@ -190,9 +246,44 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
       } satisfies ScenePath,
     };
   });
-  const branches = branchProjection.map(({ scene }) => scene);
+  const branches = genome.morphology === "SUCCULENT" ? [] : branchProjection.map(({ scene }) => scene);
 
-  const buds = branchProjection.map(({ endX: cx, endY: cy }, index) => {
+  const secondaryStems = genome.morphology === "SHRUB" || genome.morphology === "WILDFLOWER"
+    ? branchProjection.slice(0, Math.max(1, Math.ceil(genome.stem.branch_count / 2))).map(({ endX, endY, scene }, index) => ({
+      ...scene,
+      key: `${scenePrefix}-secondary-${index}`,
+      d: `M ${BASE_X} ${BASE_Y} Q ${round((BASE_X + endX) / 2)} ${round(BASE_Y - height * 0.28)}, ${endX} ${endY}`,
+      strokeWidth: Math.max(1.1, scene.strokeWidth * 0.82),
+    }))
+    : [];
+  const tendrils = genome.morphology === "VINE"
+    ? branchProjection.slice(0, Math.max(1, genome.stem.branch_count - 1)).map(({ endX, endY }, index) => ({
+      key: `${scenePrefix}-tendril-${index}`,
+      d: `M ${endX} ${endY} q ${8 + index * 2} ${-10 - index * 2}, ${12 + index * 3} 0 q ${4 + index} ${8 + index}, ${-5 - index} ${10 + index}`,
+      stroke: stemColor,
+      strokeWidth: Math.max(1, genome.stem.thickness * 0.25),
+      opacity: branchProgress,
+      progress: branchProgress,
+    }))
+    : [];
+  const rosetteLeaves = genome.morphology === "SUCCULENT"
+    ? genome.leaves.map((leaf, index) => {
+      const angle = (360 / genome.leaves.length) * index + genome.flower.tilt_degrees;
+      const radians = (angle * Math.PI) / 180;
+      const size = Math.max(12, leaf.size * 0.92);
+      return {
+        key: `${scenePrefix}-rosette-${index}`,
+        cx: round(BASE_X + Math.cos(radians) * size * 0.28),
+        cy: round(BASE_Y - 8 + Math.sin(radians) * size * 0.16),
+        size: round(size), angle, shape: leaf.shape,
+        fill: index % 2 === 0 ? leafPrimary : leafSecondary,
+        accent: index % 2 === 0 ? leafSecondary : leafPrimary,
+        opacity: leafProgress, progress: leafProgress,
+      } satisfies SceneLeaf;
+    })
+    : [];
+
+  const buds = (genome.morphology === "SUCCULENT" ? [] : branchProjection).map(({ endX: cx, endY: cy }, index) => {
     return {
       key: `${scenePrefix}-bud-${index}`,
       cx,
@@ -204,7 +295,7 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
     } satisfies SceneDot;
   });
 
-  const petals = Array.from({ length: genome.flower.petal_count }, (_, index) => {
+  const petals = Array.from({ length: genome.flower.kind === "CLUSTER" ? 0 : genome.flower.petal_count }, (_, index) => {
     const angle = genome.flower.tilt_degrees + (360 / genome.flower.petal_count) * index;
     const radius = genome.flower.size * (genome.flower.kind === "CLUSTER" ? 0.2 : 0.32);
     const radians = (angle * Math.PI) / 180;
@@ -221,9 +312,16 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
       progress: flowerProgress,
     } satisfies ScenePetal;
   });
+  const flowerHeads = genome.flower.kind === "CLUSTER"
+    ? Array.from({ length: Math.min(5, Math.max(3, Math.ceil(genome.flower.petal_count / 2))) }, (_, index) => {
+      const angle = (360 / Math.min(5, Math.max(3, Math.ceil(genome.flower.petal_count / 2)))) * index + genome.flower.tilt_degrees;
+      const radians = (angle * Math.PI) / 180;
+      return { key: `${scenePrefix}-head-${index}`, cx: round(top.x + Math.cos(radians) * genome.flower.size * 0.34), cy: round(top.y + Math.sin(radians) * genome.flower.size * 0.28), radius: round(Math.max(3, genome.flower.size * 0.16)), fill: index % 2 === 0 ? flowerPrimary : flowerSecondary, accent: flowerSecondary, opacity: flowerProgress, progress: flowerProgress } satisfies SceneFlowerHead;
+    })
+    : [];
 
   const dewDrops = Array.from({ length: genome.effects.dew_drops }, (_, index) => {
-    const leaf = leaves[index % Math.max(1, leaves.length)];
+    const leaf = [...leaves, ...rosetteLeaves][index % Math.max(1, leaves.length + rosetteLeaves.length)];
     return {
       key: `${scenePrefix}-dew-${index}`,
       cx: round((leaf?.cx ?? top.x) + (index % 2 === 0 ? 2 : -2)),
@@ -260,14 +358,19 @@ export function buildPlantScene(genome: PlantGenome, requestedGrowth: number): P
     },
     stem,
     branches,
+    secondaryStems,
+    tendrils,
     leaves,
+    rosetteLeaves,
     buds,
     petals,
+    flowerHeads,
     flowerCenter: {
       key: `${scenePrefix}-flower-center`, cx: top.x, cy: top.y, radius: round(3 + genome.flower.size * 0.12), fill: flowerSecondary, opacity: flowerProgress, progress: flowerProgress,
     },
     dewDrops,
     pollen,
     glow: Math.min(1, Math.max(0, genome.effects.glow / 100)) * flowerProgress,
+    groundShadow: { cx: BASE_X, cy: BASE_Y + 8, rx: round(23 + genome.stem.thickness * 1.3), ry: 5, fill: "rgb(115 94 66)", opacity: 0.11 + leafProgress * 0.13, progress: leafProgress },
   };
 }

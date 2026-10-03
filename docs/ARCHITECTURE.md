@@ -42,9 +42,11 @@ The M6 native acceptance exercised this boundary through the release executable:
 
 `schema_migrations` is bootstrapped as infrastructure and every migration is an ordered registry entry executed within its own transaction. Recorded versions must form a continuous prefix beginning at 1 (for example, `[]`, `[1]`, or `[1,2]`); a gap is rejected with `MIGRATION_HISTORY_INVALID` before any pending migration runs. Version 1 creates only `app_metadata`. A database newer than `CURRENT_SCHEMA_VERSION` is rejected separately with `UNSUPPORTED_FUTURE_SCHEMA`; migrations never downgrade, reset, or alter historical migration definitions. Persisted timestamps use UTC Unix epoch milliseconds.
 
-## Future plant renderer boundary
+## Plant generator and renderer boundary
 
-The planned SVG renderer is a React/TypeScript projection of an authoritative plant genome produced by Rust. Rendering may interpret the description visually, but it must not generate or mutate plant identity, genome, rarity, or growth truth. M3's generator is a pure Rust-domain function: stable generation input resolves to a saveable seed, and the V1 generator replayably maps that seed to an ordered, integer-only genome. It has no React, SVG, Tauri, SQLite, clock, or uncontrolled-randomness dependency.
+The SVG renderer is a React/TypeScript projection of an authoritative plant genome produced by Rust. Rendering may interpret the description visually, but it must not generate or mutate plant identity, genome, rarity, or growth truth. M3's generator is a pure Rust-domain function: stable generation input resolves to a saveable seed, and the V1 generator replayably maps that seed to an ordered, integer-only genome. It has no React, SVG, Tauri, SQLite, clock, or uncontrolled-randomness dependency.
+
+M11's Plant Visual System V1.1 remains entirely inside this presentation boundary. It derives morphology-specific stems, fern fronds, succulent rosettes, vine tendrils, shrub canopies, distinct leaf outlines, and distinct flower geometry from the already persisted V1 genome plus supplied growth. These scene objects are disposable projections: they are never serialized, written to SQLite, or returned through native commands. The V1 generator, seed contract, genome JSON, generator version 1, immutable plant receipts, and schema version 5 remain unchanged. Live Focus plants may use subtle CSS motion, while completed and Garden plants remain static; reduced-motion preferences suppress non-essential animation.
 
 ## Focus-session timer and recovery
 

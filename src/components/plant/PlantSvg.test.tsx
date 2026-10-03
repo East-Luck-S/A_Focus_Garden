@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { PlantGenome } from "../../shared/plant";
 
 import { PlantSvg } from "./PlantSvg";
-import { buildPlantScene, clampGrowth } from "./plant-scene";
+import { buildLeafPath, buildPlantScene, clampGrowth } from "./plant-scene";
 
 const genome: PlantGenome = {
   generator_version: 1,
@@ -123,6 +123,88 @@ describe("buildPlantScene", () => {
     expect(vineScene.petals[0]?.kind).toBe("BELL");
     expect(vineScene.leaves[0]?.cx).not.toBe(shrub.leaves[0]?.cx);
   });
+
+  it("gives every morphology a distinct deterministic structural signature", () => {
+    const morphologies = ["FERN", "SUCCULENT", "WILDFLOWER", "VINE", "SHRUB"] as const;
+    const scenes = Object.fromEntries(
+      morphologies.map((morphology) => [morphology, buildPlantScene({ ...genome, morphology }, 1)]),
+    ) as Record<(typeof morphologies)[number], ReturnType<typeof buildPlantScene>>;
+    const signatures = morphologies.map((morphology) => {
+      const scene = scenes[morphology];
+      return JSON.stringify({
+        stem: scene.stem.d,
+        branches: scene.branches.length,
+        secondaryStems: scene.secondaryStems.length,
+        tendrils: scene.tendrils.length,
+        leaves: scene.leaves.map(({ cx, cy, size }) => [cx, cy, size]),
+        rosetteLeaves: scene.rosetteLeaves.map(({ cx, cy, size }) => [cx, cy, size]),
+      });
+    });
+
+    expect(new Set(signatures).size).toBe(morphologies.length);
+    expect(scenes.FERN.leaves).toHaveLength(genome.leaves.length * 3);
+    expect(scenes.SUCCULENT.leaves).toHaveLength(0);
+    expect(scenes.SUCCULENT.branches).toHaveLength(0);
+    expect(scenes.SUCCULENT.buds).toHaveLength(0);
+    expect(scenes.SUCCULENT.rosetteLeaves).toHaveLength(genome.leaves.length);
+    expect(scenes.WILDFLOWER.secondaryStems.length).toBeGreaterThan(0);
+    expect(scenes.VINE.tendrils.length).toBeGreaterThan(0);
+    expect(scenes.SHRUB.secondaryStems.length).toBeGreaterThan(0);
+  });
+
+  it("builds four genuinely different leaf outlines", () => {
+    const sourceLeaf = buildPlantScene(genome, 1).leaves[0]!;
+    const shapes = ["OVAL", "LANCEOLATE", "SERRATED", "ROUND"] as const;
+    const paths = shapes.map((shape) => buildLeafPath({ ...sourceLeaf, shape }));
+
+    expect(new Set(paths).size).toBe(shapes.length);
+    expect((paths[2]!.match(/ L /g) ?? []).length).toBeGreaterThan(6);
+  });
+
+  it("keeps morphology-specific organs inside their growth stages", () => {
+    const succulentAtSeed = buildPlantScene({ ...genome, morphology: "SUCCULENT" }, 0);
+    const succulentAtLeaves = buildPlantScene({ ...genome, morphology: "SUCCULENT" }, 0.6);
+    expect(succulentAtSeed.rosetteLeaves.every(({ opacity, progress }) => opacity === 0 && progress === 0)).toBe(true);
+    expect(succulentAtLeaves.rosetteLeaves.every(({ opacity, progress }) => opacity === 1 && progress === 1)).toBe(true);
+
+    const vineAtBranchStart = buildPlantScene({ ...genome, morphology: "VINE" }, 0.6);
+    const vineAtFlowerStart = buildPlantScene({ ...genome, morphology: "VINE" }, 0.85);
+    expect(vineAtBranchStart.tendrils.every(({ opacity, progress }) => opacity === 0 && progress === 0)).toBe(true);
+    expect(vineAtFlowerStart.tendrils.every(({ opacity, progress }) => opacity === 1 && progress === 1)).toBe(true);
+
+    const shrubAtBranchStart = buildPlantScene({ ...genome, morphology: "SHRUB" }, 0.6);
+    expect(shrubAtBranchStart.secondaryStems.every(({ opacity, progress }) => opacity === 0 && progress === 0)).toBe(true);
+
+    const cluster = { ...genome, flower: { ...genome.flower, kind: "CLUSTER" as const } };
+    expect(buildPlantScene(cluster, 0.85).flowerHeads.every(({ opacity, progress }) => opacity === 0 && progress === 0)).toBe(true);
+    expect(buildPlantScene(cluster, 1).flowerHeads.every(({ opacity, progress }) => opacity === 1 && progress === 1)).toBe(true);
+  });
+
+  it("keeps all scene numbers finite and bounded effects safe", () => {
+    const scene = buildPlantScene({
+      ...genome,
+      effects: { glow: 100, dew_drops: 7, pollen: 15, breeze_offset: 12 },
+    }, 1);
+    const numbers: number[] = [];
+    const collectNumbers = (value: unknown) => {
+      if (typeof value === "number") numbers.push(value);
+      else if (Array.isArray(value)) value.forEach(collectNumbers);
+      else if (value && typeof value === "object") Object.values(value).forEach(collectNumbers);
+    };
+    collectNumbers(scene);
+
+    expect(numbers.every(Number.isFinite)).toBe(true);
+    expect(scene.dewDrops).toHaveLength(7);
+    expect(scene.pollen).toHaveLength(15);
+    expect(scene.glow).toBe(1);
+    for (const part of [scene.seed, scene.flowerCenter, ...scene.buds, ...scene.dewDrops, ...scene.pollen]) {
+      expect(part.radius).toBeGreaterThan(0);
+      expect(part.opacity).toBeGreaterThanOrEqual(0);
+      expect(part.opacity).toBeLessThanOrEqual(1);
+      expect(part.progress).toBeGreaterThanOrEqual(0);
+      expect(part.progress).toBeLessThanOrEqual(1);
+    }
+  });
 });
 
 describe("PlantSvg", () => {
@@ -133,8 +215,28 @@ describe("PlantSvg", () => {
     expect(image.tagName).toBe("svg");
     expect(image).toHaveAttribute("viewBox", "0 0 240 280");
     expect(image).toHaveAttribute("data-growth-stage", "FLOWER");
+    expect(image).toHaveAttribute("data-morphology", "SHRUB");
+    expect(image).toHaveAttribute("data-flower-kind", "STAR");
     expect(container.querySelectorAll("path").length).toBeGreaterThan(4);
     expect(container.querySelectorAll("svg defs")).toHaveLength(0);
+  });
+
+  it.each([
+    ["BLOOM", "ellipse", "petal"],
+    ["BELL", "path", "petal"],
+    ["STAR", "polygon", "petal"],
+    ["CLUSTER", "g", "flower-head"],
+  ] as const)("renders %s with its own SVG geometry", (kind, tagName, part) => {
+    const { container } = render(
+      <PlantSvg genome={{ ...genome, flower: { ...genome.flower, kind } }} growth={1} />,
+    );
+    const geometry = container.querySelectorAll(`[data-plant-part="${part}"]`);
+
+    expect(geometry.length).toBeGreaterThan(0);
+    expect([...geometry].every((node) => node.tagName.toLowerCase() === tagName)).toBe(true);
+    if (kind === "CLUSTER") {
+      expect(container.querySelectorAll('[data-plant-part="petal"]')).toHaveLength(0);
+    }
   });
 
   it.each([

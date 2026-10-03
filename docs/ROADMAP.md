@@ -1,6 +1,6 @@
 # Roadmap
 
-M10 is closed. Version 1.0.0-rc.1 is the Chinese Windows core release candidate; M11 remains deferred.
+M11 is closed. M12 is active; Plant Visual System V1.1 remains renderer-only over persisted V1 genomes.
 
 1. **M0 — Repository Foundation & Windows Native Baseline**
 2. **M1 — Persistence & Native Boundary Foundation**
@@ -13,9 +13,9 @@ M10 is closed. Version 1.0.0-rc.1 is the Chinese Windows core release candidate;
 9. **M8 — Formal Focus Flow & Duration Settings** — CLOSED
 10. **M9 — Core Garden & Local Overview** — CLOSED
 11. **M10 — Chinese Windows Release Candidate** — CLOSED
-12. **M11 — Plant System Expansion & Visual Quality** — DEFERRED
-13. **M12 — UX / Accessibility / Performance Hardening**
+12. **M11 — Plant System Expansion & Visual Quality** — CLOSED
+13. **M12 — UX / Accessibility / Performance Hardening** — ACTIVE
 14. **M13 — Release Hardening**
 15. **V1.0 — Windows Release**
 
-This roadmap names scope. M7 established the Chinese-first shell, M8 established formal duration settings and focus-flow interaction, M9 established the local Garden overview, and M10 established the 1.0.0-rc.1 Windows release candidate. M11 and later milestones remain deferred.
+This roadmap names scope. M7 established the Chinese-first shell, M8 established formal duration settings and focus-flow interaction, M9 established the local Garden overview, M10 established the 1.0.0-rc.1 Windows release candidate, and M11 expanded visual expression without changing persisted V1 genomes. M12 is active; M13 and V1.0 remain deferred until their preceding gates pass.

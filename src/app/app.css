@@ -33,6 +33,12 @@ button:disabled { cursor: not-allowed; opacity: .62; transform: none; }
 .duration:hover, .primary:hover, .quiet:hover { transform: translateY(-1px); }
 .session-view { margin-top: 1.4rem; }
 .live-plant { display: block; width: min(100%, 17rem); height: 15rem; margin: 0 auto -.2rem; }
+.live-plant[data-morphology="VINE"], .live-plant[data-morphology="FERN"] { transform-origin: 50% 100%; animation: plant-sway 5.6s ease-in-out infinite alternate; }
+.live-plant [data-plant-part="pollen"] { animation: pollen-drift 3.8s ease-in-out infinite alternate; }
+.live-plant [data-plant-part="dew"] { animation: dew-glint 2.8s ease-in-out infinite alternate; }
+@keyframes plant-sway { from { transform: rotate(-1deg); } to { transform: rotate(1deg); } }
+@keyframes pollen-drift { from { transform: translate(0); } to { transform: translate(2px, -3px); } }
+@keyframes dew-glint { from { filter: brightness(.92); } to { filter: brightness(1.18); } }
 .timer { display: block; font-size: clamp(3rem, 14vw, 4.8rem); font-weight: 300; letter-spacing: -.07em; font-variant-numeric: tabular-nums; }
 .recovery { margin-top: 1.25rem; color: #617269; font-size: .94rem; }
 .notice { margin-top: 1rem; color: #aa5e62; font-size: .9rem; }
