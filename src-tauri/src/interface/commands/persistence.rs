@@ -104,3 +104,44 @@ pub fn get_persistence_status(
 ) -> Result<PersistenceStatus, NativeError> {
     service.get_persistence_status().map_err(NativeError::from)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::NativeError;
+    use crate::{
+        application::focus_session_service::FocusSessionServiceError,
+        infrastructure::{
+            focus_session_repository::SessionRepositoryError,
+            persistence::{MigrationError, PersistenceError},
+        },
+    };
+
+    const SENTINEL: &str = "C:\\private\\user.sqlite SELECT plant_seed";
+
+    #[test]
+    fn native_error_payloads_never_serialize_underlying_diagnostics() {
+        let errors = [
+            NativeError::from(PersistenceError::Directory(std::io::Error::other(SENTINEL))),
+            NativeError::from(PersistenceError::DatabaseOpen(
+                rusqlite::Error::InvalidParameterName(SENTINEL.to_owned()),
+            )),
+            NativeError::from(PersistenceError::Migration(MigrationError::Failed {
+                version: 99,
+                name: SENTINEL,
+                source: rusqlite::Error::InvalidQuery,
+            })),
+            NativeError::from(FocusSessionServiceError::Repository(
+                SessionRepositoryError::Database(rusqlite::Error::InvalidParameterName(
+                    SENTINEL.to_owned(),
+                )),
+            )),
+        ];
+
+        for error in errors {
+            let payload = serde_json::to_string(&error).expect("native error should serialize");
+            assert!(!payload.contains(SENTINEL));
+            assert!(!payload.contains("private"));
+            assert!(!payload.contains("plant_seed"));
+        }
+    }
+}

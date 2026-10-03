@@ -3,7 +3,10 @@ import { nativeErrorMessage, normalizeNativeError } from "./errors";
 
 describe("native error normalization", () => {
   it("normalizes object, string, and unknown rejection values", () => {
-    expect(normalizeNativeError({ code: "SESSION_INVALID_TRANSITION", message: "internal" }).code).toBe("SESSION_INVALID_TRANSITION");
+    const normalized = normalizeNativeError({ code: "SESSION_INVALID_TRANSITION", message: "C:\\private\\raw.sqlite SELECT secret" });
+    expect(normalized.code).toBe("SESSION_INVALID_TRANSITION");
+    expect(normalized.message).toBe("Native command failed.");
+    expect(normalized.message).not.toContain("private");
     expect(normalizeNativeError("native failure").code).toBe("UNKNOWN_NATIVE_ERROR");
     expect(normalizeNativeError(null).code).toBe("UNKNOWN_NATIVE_ERROR");
   });

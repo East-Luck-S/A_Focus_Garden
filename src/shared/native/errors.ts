@@ -30,7 +30,7 @@ const localizedCopy: Record<string, string> = {
 export function normalizeNativeError(reason: unknown): NativeCommandError {
   const candidate = typeof reason === "object" && reason !== null ? reason as Record<string, unknown> : null;
   const code = typeof candidate?.code === "string" ? candidate.code : "UNKNOWN_NATIVE_ERROR";
-  const error = new Error(typeof candidate?.message === "string" ? candidate.message : "") as NativeCommandError;
+  const error = new Error("Native command failed.") as NativeCommandError;
   error.code = code;
   return error;
 }

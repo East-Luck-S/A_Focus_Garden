@@ -1,6 +1,6 @@
 [package]
 name = "focus-garden"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 description = "专注花园 Windows 桌面应用"
 authors = ["Focus Garden contributors"]
 edition = "2021"

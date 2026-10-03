@@ -1,5 +1,14 @@
 # Execution Log
 
+## M13 — Release Hardening — PAUSED CHECKPOINT
+
+- Unified the source and lockfile root versions at internal candidate `1.0.0-rc.2` while preserving the stable `Focus Garden` package identity, `com.focusgarden.desktop` data identity, schema version 5, and generator version 1.
+- Reduced the native WebView attack surface: production CSP no longer permits inline styles, prototype freezing is enabled, Tauri CSP asset hardening remains enabled, only the named `default` capability is loaded, and that main-window capability grants no unused Tauri core commands. Static tests lock these constraints.
+- Native command normalization now discards the native diagnostic message before it enters frontend state. Rust serialization tests cover filesystem, SQLite, migration, and repository sentinel diagnostics and confirm that paths, SQL text, and plant seed field names do not enter IPC error payloads.
+- Security evidence at this checkpoint: complete npm audit reported zero known vulnerabilities. RustSec reported zero vulnerabilities across 443 locked dependencies; its `glib` unsoundness warning is absent from the Windows target tree, while informational unmaintained/yanked transitive build dependencies remain documented for later release review rather than prompting an unscoped framework upgrade.
+- Validation completed before the checkpoint: frontend security and product tests pass at 66/66; TypeScript and lint passed before the final test-only assertion adjustment. Locked Rust formatting, check, clippy, 52 library tests, and 2 release-shell tests passed. The real Tauri rc.2 development executable compiled, launched with the reduced capability set, remained responsive, and exited without a residual application process.
+- No rc.2 release package has been produced or represented as complete. Remaining M13 gates are a final clean `npm ci`/full regression, licensing and third-party notice decisions, release build and artifact scan, hash/signature evidence, rc.1 and 0.1.0 upgrade/data-retention validation, Windows 10/11 plus assistive-technology acceptance, and code signing. Public V1.0 is blocked on a Human-selected distribution license/EULA and Windows publisher/signing identity.
+
 ## M12 — UX / Accessibility / Performance Hardening — CLOSED
 
 - Hardened the Chinese Focus flow around stable focus placement, explicit duration validation, meaningful state announcements, and a fully contained abandonment dialog. The wall-clock projection interval exists only while an active session has time remaining and clears itself at zero; paused and recovery previews remain static. Garden entry, retry, pagination exhaustion, and detail-dialog close all preserve a predictable keyboard focus target.
