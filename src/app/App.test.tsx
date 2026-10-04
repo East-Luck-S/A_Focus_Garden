@@ -80,6 +80,29 @@ describe("App", () => {
     expect(updateAppSettings).toHaveBeenCalledWith(2_700_000);
   });
 
+  it("opens an accessible Chinese About dialog and restores focus after Escape", async () => {
+    render(<App />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    const trigger = screen.getByRole("button", { name: "关于" });
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "关于专注花园" });
+    expect(within(dialog).getByText("1.0.0-rc.2")).toBeInTheDocument();
+    expect(within(dialog).getByText(/本机 SQLite 数据库/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/THIRD_PARTY_NOTICES\.txt/)).toBeInTheDocument();
+    const close = within(dialog).getByRole("button", { name: "关闭" });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "关于专注花园" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it("does not expose legacy English controls or raw session enums", async () => {
     vi.mocked(getCurrentFocusSession).mockResolvedValue(session());
     render(<App />);

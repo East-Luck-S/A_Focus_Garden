@@ -32,6 +32,7 @@ Record the exact executable and installer sizes, SHA-256 hashes, versions, and s
 - Run `npm audit` and `cargo audit`; triage every advisory for the Windows target rather than ignoring aggregate output.
 - Regenerate `THIRD_PARTY_NOTICES.txt` after every intentional dependency change, review the collected license text, and verify that its embedded lockfile hashes are current.
 - Confirm that the installed `THIRD_PARTY_NOTICES.txt` exactly matches the reviewed source file.
+- Open the Chinese About dialog and confirm the displayed package version, local-only data statement, and third-party notice filename match the reviewed build.
 - Confirm the Human-selected Focus Garden license/EULA and publisher identity.
 - Do not publish an artifact reported as `NotSigned`.
 

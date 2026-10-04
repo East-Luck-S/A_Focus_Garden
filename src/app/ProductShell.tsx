@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+
+import packageMetadata from "../../package.json";
 
 import { FocusScreen } from "../features/focus/FocusScreen";
 import { GardenScreen } from "../features/garden/GardenScreen";
@@ -22,8 +24,12 @@ export function ProductShell() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [gardenRevision, setGardenRevision] = useState(0);
   const [view, setView] = useState<View>("FOCUS");
+  const [aboutOpen, setAboutOpen] = useState(false);
   const focusAfterRetryRef = useRef(false);
   const appTitleRef = useRef<HTMLHeadingElement>(null);
+  const aboutTriggerRef = useRef<HTMLButtonElement>(null);
+  const aboutCloseRef = useRef<HTMLButtonElement>(null);
+  const restoreAboutFocusRef = useRef(false);
 
   const loadCore = useCallback(
     async () =>
@@ -71,6 +77,15 @@ export function ProductShell() {
     }
   }, [boot]);
 
+  useEffect(() => {
+    if (aboutOpen) {
+      aboutCloseRef.current?.focus();
+    } else if (restoreAboutFocusRef.current) {
+      restoreAboutFocusRef.current = false;
+      aboutTriggerRef.current?.focus();
+    }
+  }, [aboutOpen]);
+
   const handlePlanted = () => {
     setGardenRevision((current) => current + 1);
   };
@@ -78,6 +93,23 @@ export function ProductShell() {
   const saveSettings = async (durationMs: number) => {
     const next = await updateAppSettings(durationMs);
     setSettings(next);
+  };
+
+  const closeAbout = () => {
+    restoreAboutFocusRef.current = true;
+    setAboutOpen(false);
+  };
+
+  const handleAboutKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Tab") {
+      event.preventDefault();
+      aboutCloseRef.current?.focus();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAbout();
+    }
   };
 
   if (boot === "LOADING") {
@@ -138,6 +170,15 @@ export function ProductShell() {
             >
               花园
             </button>
+            <button
+              ref={aboutTriggerRef}
+              className="quiet"
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setAboutOpen(true)}
+            >
+              关于
+            </button>
           </nav>
         </header>
 
@@ -154,6 +195,58 @@ export function ProductShell() {
           <GardenScreen refreshKey={gardenRevision} />
         )}
       </section>
+
+      {aboutOpen ? (
+        <div className="dialog-backdrop">
+          <section
+            className="confirm-dialog about-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="about-title"
+            aria-describedby="about-summary"
+            onKeyDown={handleAboutKeyDown}
+          >
+            <p className="eyebrow">应用信息</p>
+            <h2 id="about-title">关于专注花园</h2>
+            <p id="about-summary" className="about-summary">
+              一座只属于这台电脑的安静花园。
+            </p>
+            <dl className="about-facts">
+              <div>
+                <dt>版本</dt>
+                <dd>{packageMetadata.version}</dd>
+              </div>
+              <div>
+                <dt>数据</dt>
+                <dd>仅保存在本机</dd>
+              </div>
+              <div>
+                <dt>联网</dt>
+                <dd>无需账户与网络</dd>
+              </div>
+            </dl>
+            <p>
+              专注记录与植物数据保存在本机 SQLite 数据库中；当前版本不包含账户、云同步、遥测或广告。
+            </p>
+            <p>
+              若检测到数据库或迁移异常，应用会停止相关操作并保留原数据，不会自动重置数据库。
+            </p>
+            <p>
+              第三方开源许可全文随应用安装，文件名为 <code>THIRD_PARTY_NOTICES.txt</code>。
+            </p>
+            <div className="actions">
+              <button
+                ref={aboutCloseRef}
+                className="primary"
+                type="button"
+                onClick={closeAbout}
+              >
+                关闭
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -94,6 +94,8 @@ npm run licenses:generate
 
 The generated notice covers third-party software only. It does not choose or grant a license for Focus Garden itself.
 
+The Chinese in-app “关于” dialog reports the package version, summarizes the local-only data boundary, and points users to the installed `THIRD_PARTY_NOTICES.txt` without exposing a user-specific filesystem path.
+
 ## Persistence and focus-session foundation
 
 Rust exclusively owns SQLite. React uses a typed native wrapper for the explicit `get_persistence_status` command and has no SQL or database-path access. On native startup, Tauri resolves the application's local data directory, safely creates it when needed, and initializes `focus-garden.sqlite3` there. The precise user-specific directory is intentionally not part of the frontend API or this documentation.

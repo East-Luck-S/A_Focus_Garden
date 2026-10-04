@@ -80,6 +80,13 @@ button:disabled { cursor: not-allowed; opacity: .62; transform: none; }
 .confirm-dialog h2 { font-size: 1.25rem; }
 .confirm-dialog p:not(.eyebrow) { line-height: 1.65; }
 .confirm-dialog .actions { justify-content: flex-end; }
+.about-dialog { width: min(100%, 29rem); }
+.about-summary { margin-top: .65rem; color: #405549; font-weight: 650; }
+.about-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 1.2rem 0; }
+.about-facts div { min-width: 0; padding: .75rem; border: 1px solid #d8e0d2; border-radius: .9rem; background: #f4f7ed; }
+.about-facts dt { color: #5b6c61; font-size: .72rem; }
+.about-facts dd { margin: .25rem 0 0; color: #3e5647; font-size: .84rem; font-weight: 700; overflow-wrap: anywhere; }
+.about-dialog code { padding: .08rem .28rem; border-radius: .3rem; color: #334a3c; background: #e9eee4; font-size: .82em; }
 .garden-view { max-width: 58rem; margin-inline: auto; text-align: left; }
 .garden-shell-card { width: min(100%, 58rem); }
 .garden-view > h2 { margin: 0; color: #34483c; font-size: 1.35rem; }
@@ -107,6 +114,7 @@ button:disabled { cursor: not-allowed; opacity: .62; transform: none; }
   .main-nav { width: 100%; }
   .main-nav button { flex: 1; }
   .completion-facts { grid-template-columns: 1fr; }
+  .about-facts { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 700px) {
@@ -133,7 +141,7 @@ button:disabled { cursor: not-allowed; opacity: .62; transform: none; }
 
 @media (forced-colors: active) {
   button:focus-visible, input:focus-visible, [tabindex="-1"]:focus { outline: 3px solid Highlight; outline-offset: 3px; }
-  .focus-card, .confirm-dialog, .primary, .quiet, .duration, .custom-duration input, .recovery, .garden-plant-card { border: 1px solid ButtonText; }
+  .focus-card, .confirm-dialog, .primary, .quiet, .duration, .custom-duration input, .recovery, .garden-plant-card, .about-facts div { border: 1px solid ButtonText; }
   [aria-current="page"], [aria-pressed="true"] { outline: 2px solid Highlight; text-decoration: underline; }
   .notice, .danger-action, .field-error { color: LinkText; }
 }
