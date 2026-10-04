@@ -5,10 +5,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 type TauriConfig = {
+  build: {
+    beforeDevCommand?: string;
+    devUrl?: string;
+  };
   app: {
     security: {
       csp: string;
-      devCsp: string;
+      devCsp?: string;
       freezePrototype: boolean;
       dangerousDisableAssetCspModification: boolean;
       capabilities: string[];
@@ -30,12 +34,23 @@ describe("release security configuration", () => {
     join(process.cwd(), "src-tauri", "capabilities", "default.json"),
     "utf8",
   )) as Capability;
+  const developmentConfig = JSON.parse(readFileSync(
+    join(process.cwd(), "src-tauri", "tauri.dev.conf.json"),
+    "utf8",
+  )) as {
+    build: { beforeDevCommand: string; devUrl: string };
+    app: { security: { devCsp: string } };
+  };
 
   it("keeps the production CSP local and free of development or inline-script allowances", () => {
     expect(config.app.security.csp).not.toMatch(/http:\/\/localhost:1420|ws:\/\/|unsafe-inline|unsafe-eval|\*/);
     expect(config.app.security.csp).toContain("object-src 'none'");
     expect(config.app.security.csp).toContain("frame-ancestors 'none'");
-    expect(config.app.security.devCsp).toContain("http://localhost:1420");
+    expect(config.app.security.devCsp).toBeUndefined();
+    expect(config.build.devUrl).toBeUndefined();
+    expect(config.build.beforeDevCommand).toBeUndefined();
+    expect(developmentConfig.build.devUrl).toBe("http://localhost:1420");
+    expect(developmentConfig.app.security.devCsp).toContain("ws://localhost:1420");
   });
 
   it("enables only the named main-window capability and keeps Tauri CSP hardening active", () => {

@@ -48,7 +48,7 @@ npm run dev
 Run the native Tauri application:
 
 ```powershell
-npm run tauri dev
+npm run dev:native
 ```
 
 ## Validation
@@ -88,8 +88,16 @@ The database has migration tracking (`schema_migrations`), application metadata 
 Build the release executable and NSIS installer:
 
 ```powershell
-npm run tauri build
+npm run release:build
 ```
+
+The release script uses stable Rust path remapping so packaged binaries do not retain the build machine's workspace or Cargo home paths. It also verifies artifact versions, hashes, signature status, source-map absence, and the absence of build paths, development endpoints, private-key markers, or common key-like tokens. Re-run the artifact checks without rebuilding with:
+
+```powershell
+npm run release:verify
+```
+
+Pass `-RequireSignature` directly to `scripts/verify-release.ps1` for a public build after the Human-selected Windows signing identity is available. Internal release candidates are allowed to report `NotSigned`; public V1.0 is not.
 
 Generated frontend output, Rust targets, and native bundles are intentionally excluded from version control.
 

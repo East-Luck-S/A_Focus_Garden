@@ -113,3 +113,9 @@ The foundation window uses only Tauri core defaults. The template greeting comma
 **Status:** Accepted for M0
 
 The native acceptance build produces a Windows executable and NSIS installer. Limiting the target avoids adding the MSI-specific VBSCRIPT/WiX gate while still validating the Windows packaging pipeline.
+
+## ADR-020: Production and development native configurations are separate
+
+**Status:** Accepted and implemented for M13
+
+The production Tauri configuration contains no development URL, development command, or development CSP. Native development explicitly selects a small override file, while release compilation uses stable Rust path remapping and mandatory artifact scanning. This prevents development endpoints and host-specific source paths from becoming accidental release inputs. Signature verification is supported as a strict public-release mode, but the signing identity remains a Human product/distribution decision.

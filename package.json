@@ -11,7 +11,10 @@
     "test": "vitest",
     "test:run": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test:run && npm run build",
+    "dev:native": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "preview": "vite preview",
+    "release:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
+    "release:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
     "tauri": "tauri"
   },
   "dependencies": {
