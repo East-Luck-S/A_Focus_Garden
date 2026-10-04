@@ -18,6 +18,9 @@ type TauriConfig = {
       capabilities: string[];
     };
   };
+  bundle: {
+    resources: Record<string, string>;
+  };
 };
 
 type Capability = {
@@ -59,5 +62,11 @@ describe("release security configuration", () => {
     expect(config.app.security.dangerousDisableAssetCspModification).toBe(false);
     expect(capability.windows).toEqual(["main"]);
     expect(capability.permissions).toEqual([]);
+  });
+
+  it("ships the lockfile-bound third-party notice as a named release resource", () => {
+    expect(config.bundle.resources).toEqual({
+      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt",
+    });
   });
 });

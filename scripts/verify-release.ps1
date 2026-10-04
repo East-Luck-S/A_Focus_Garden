@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $releaseWorkspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $releaseManifestPath = Join-Path $releaseWorkspace "package.json"
+$releaseNoticeVerifier = Join-Path $releaseWorkspace "scripts\verify-third-party-notices.ps1"
 $releaseManifest = Get-Content -LiteralPath $releaseManifestPath -Raw | ConvertFrom-Json
 $releaseVersion = [string]$releaseManifest.version
 $releaseTarget = Join-Path $releaseWorkspace "src-tauri\target\release"
@@ -13,6 +14,8 @@ $releaseArtifacts = @(
   Join-Path $releaseTarget "focus-garden.exe"
   Join-Path $releaseTarget "bundle\nsis\Focus Garden_${releaseVersion}_x64-setup.exe"
 )
+
+& $releaseNoticeVerifier
 
 if (-not (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)) {
   $securityModule = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1"

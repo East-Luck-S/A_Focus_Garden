@@ -27,6 +27,9 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "resources": {
+      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
+    },
     "shortDescription": "在专注中培育你的花园",
     "longDescription": "专注花园是一款离线 Windows 专注应用：完成专注后，将收获并种下属于你的植物。",
     "windows": {

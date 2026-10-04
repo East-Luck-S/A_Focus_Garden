@@ -119,3 +119,9 @@ The native acceptance build produces a Windows executable and NSIS installer. Li
 **Status:** Accepted and implemented for M13
 
 The production Tauri configuration contains no development URL, development command, or development CSP. Native development explicitly selects a small override file, while release compilation uses stable Rust path remapping and mandatory artifact scanning. This prevents development endpoints and host-specific source paths from becoming accidental release inputs. Signature verification is supported as a strict public-release mode, but the signing identity remains a Human product/distribution decision.
+
+## ADR-021: Third-party notices are generated from locked runtime graphs
+
+**Status:** Accepted and implemented for M13
+
+The distributed notice uses original npm runtime license files and cargo-about output for the locked non-development Windows Rust graph. Rust build dependencies remain included as a conservative disclosure. The notice embeds the SHA-256 of both dependency lockfiles, is verified before release acceptance, and is installed as a named Tauri resource. Dependency changes therefore make the notice gate fail until the inventory is deliberately regenerated and reviewed. This mechanism does not decide the license or EULA for Focus Garden itself.

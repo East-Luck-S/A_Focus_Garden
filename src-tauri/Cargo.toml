@@ -4,6 +4,7 @@ version = "1.0.0-rc.2"
 description = "专注花园 Windows 桌面应用"
 authors = ["Focus Garden contributors"]
 edition = "2021"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

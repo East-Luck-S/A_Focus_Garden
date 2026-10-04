@@ -8,6 +8,7 @@ Run from a clean checkout on the intended Windows build host:
 
 ```powershell
 npm ci
+npm run licenses:verify
 npm run check
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo check --manifest-path src-tauri/Cargo.toml --locked
@@ -29,7 +30,8 @@ Record the exact executable and installer sizes, SHA-256 hashes, versions, and s
 ## Dependency and legal gates
 
 - Run `npm audit` and `cargo audit`; triage every advisory for the Windows target rather than ignoring aggregate output.
-- Inventory production dependency licenses and prepare the final third-party notice required by the selected distribution model.
+- Regenerate `THIRD_PARTY_NOTICES.txt` after every intentional dependency change, review the collected license text, and verify that its embedded lockfile hashes are current.
+- Confirm that the installed `THIRD_PARTY_NOTICES.txt` exactly matches the reviewed source file.
 - Confirm the Human-selected Focus Garden license/EULA and publisher identity.
 - Do not publish an artifact reported as `NotSigned`.
 

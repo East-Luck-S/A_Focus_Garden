@@ -12,6 +12,8 @@
     "test:run": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test:run && npm run build",
     "dev:native": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "licenses:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-third-party-notices.ps1",
+    "licenses:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-third-party-notices.ps1",
     "preview": "vite preview",
     "release:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "release:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
