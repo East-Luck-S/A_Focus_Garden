@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
-import packageMetadata from "../../package.json";
+import { version as appVersion } from "../../package.json";
 
 import { FocusScreen } from "../features/focus/FocusScreen";
 import { GardenScreen } from "../features/garden/GardenScreen";
@@ -214,7 +214,7 @@ export function ProductShell() {
             <dl className="about-facts">
               <div>
                 <dt>版本</dt>
-                <dd>{packageMetadata.version}</dd>
+                <dd>{appVersion}</dd>
               </div>
               <div>
                 <dt>数据</dt>

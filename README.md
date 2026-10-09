@@ -1,5 +1,7 @@
 # 专注花园 / Focus Garden
 
+[![Windows CI](https://github.com/East-Luck-S/A_Focus_Garden/actions/workflows/ci.yml/badge.svg)](https://github.com/East-Luck-S/A_Focus_Garden/actions/workflows/ci.yml)
+
 专注花园是一个 Windows 专注应用：一次专注会驱动植物成长，完成后种下一株可持久保存的确定性植物。当前内部发布候选版本为 **1.0.0-rc.2**，界面与 Windows 安装体验以简体中文为主。
 
 当前本地数据库 schema 为 **v5**：它保留专注会话、确定性植物与种植记录，并保存 1–180 分钟的默认时长设置。花园以本地只读投影视图呈现，不会连接云端或自动重置本机数据。
@@ -116,7 +118,15 @@ The release script uses stable Rust path remapping so packaged binaries do not r
 npm run release:verify
 ```
 
-Pass `-RequireSignature` directly to `scripts/verify-release.ps1` for a public build after the Human-selected Windows signing identity is available. Internal release candidates are allowed to report `NotSigned`; public V1.0 is not.
+Every successful verification writes `src-tauri/target/release/release-manifest.json`. The machine-readable evidence contains only workspace-relative paths and records the exact source commit/cleanliness, synchronized package identity and version, dependency lock hashes, third-party notice hash, artifact sizes/hashes, and Authenticode status. Archive it with the matching artifacts and the SHA-256 printed by the verifier.
+
+After the Human-selected Windows signing identity is available, verify a public build with:
+
+```powershell
+npm run release:verify:public
+```
+
+Public mode requires both valid Authenticode signatures and a clean source working tree. Internal release candidates are allowed to report `NotSigned`; public V1.0 is not.
 
 Generated frontend output, Rust targets, and native bundles are intentionally excluded from version control.
 
@@ -127,3 +137,6 @@ Generated frontend output, Rust targets, and native bundles are intentionally ex
 - [Roadmap](docs/ROADMAP.md)
 - [Decisions](docs/DECISIONS.md)
 - [Data model](docs/DATA_MODEL.md)
+- [Release history](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)

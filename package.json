@@ -17,6 +17,7 @@
     "preview": "vite preview",
     "release:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "release:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
+    "release:verify:public": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -PublicRelease",
     "tauri": "tauri"
   },
   "dependencies": {

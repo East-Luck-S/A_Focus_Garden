@@ -19,13 +19,13 @@ npm run release:build
 
 `release:build` compiles with workspace and Cargo-home path remapping and then invokes `release:verify`. Verification must finish with `ARTIFACT_SCAN_CLEAN`.
 
-For a public build, require a valid Windows signature:
+For a public build, require a clean source tree and valid Windows signatures:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -RequireSignature
+npm run release:verify:public
 ```
 
-Record the exact executable and installer sizes, SHA-256 hashes, versions, and signature identities in the release log.
+Archive `src-tauri/target/release/release-manifest.json` with the exact executable and installer it describes. Record the manifest SHA-256 printed by the verifier in the release log.
 
 ## Dependency and legal gates
 

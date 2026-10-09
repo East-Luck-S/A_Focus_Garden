@@ -125,3 +125,9 @@ The production Tauri configuration contains no development URL, development comm
 **Status:** Accepted and implemented for M13
 
 The distributed notice uses original npm runtime license files and cargo-about output for the locked non-development Windows Rust graph. Rust build dependencies remain included as a conservative disclosure. The notice embeds the SHA-256 of both dependency lockfiles, is verified before release acceptance, and is installed as a named Tauri resource. Dependency changes therefore make the notice gate fail until the inventory is deliberately regenerated and reviewed. This mechanism does not decide the license or EULA for Focus Garden itself.
+
+## ADR-022: Release evidence is machine-readable and public verification is strict
+
+**Status:** Accepted and implemented for M13
+
+Every successful artifact scan writes an ignored `release-manifest.json` beside the release executable. It records only workspace-relative paths, the exact source commit and cleanliness, synchronized product identity/version, lockfile and third-party notice hashes, artifact hashes, and Authenticode status. The verifier prints the manifest hash so it can be archived with the corresponding binaries. Internal candidates may record an unsigned or dirty state, but the explicit public-release mode requires both a clean source tree and valid signatures; a normal internal scan can no longer be mistaken for public-release acceptance.

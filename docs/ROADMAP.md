@@ -1,6 +1,6 @@
 # Roadmap
 
-M12 is closed. M13 remains active: the internal rc.2 build, artifact, dependency-notice, in-app disclosure, rc.1 upgrade, restart, and data-retention gates are verified, while the product license/EULA, signing, multi-version Windows, and assistive-technology acceptance remain open. Schema version 5 and generator version 1 are unchanged.
+M12 is closed. M13 remains active: the internal rc.2 build, artifact, machine-readable release evidence, dependency-notice, in-app disclosure, rc.1 upgrade, restart, and data-retention gates are verified, while the product license/EULA, signing, multi-version Windows, and assistive-technology acceptance remain open. Schema version 5 and generator version 1 are unchanged.
 
 1. **M0 — Repository Foundation & Windows Native Baseline**
 2. **M1 — Persistence & Native Boundary Foundation**

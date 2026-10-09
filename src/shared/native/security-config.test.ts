@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 type TauriConfig = {
+  productName: string;
+  version: string;
+  identifier: string;
   build: {
     beforeDevCommand?: string;
     devUrl?: string;
@@ -20,6 +23,7 @@ type TauriConfig = {
   };
   bundle: {
     resources: Record<string, string>;
+    targets: string[];
   };
 };
 
@@ -44,6 +48,18 @@ describe("release security configuration", () => {
     build: { beforeDevCommand: string; devUrl: string };
     app: { security: { devCsp: string } };
   };
+  const packageMetadata = JSON.parse(readFileSync(
+    join(process.cwd(), "package.json"),
+    "utf8",
+  )) as {
+    name: string;
+    version: string;
+    scripts: Record<string, string>;
+  };
+  const cargoManifest = readFileSync(
+    join(process.cwd(), "src-tauri", "Cargo.toml"),
+    "utf8",
+  );
 
   it("keeps the production CSP local and free of development or inline-script allowances", () => {
     expect(config.app.security.csp).not.toMatch(/http:\/\/localhost:1420|ws:\/\/|unsafe-inline|unsafe-eval|\*/);
@@ -68,5 +84,18 @@ describe("release security configuration", () => {
     expect(config.bundle.resources).toEqual({
       "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt",
     });
+  });
+
+  it("keeps product identity and release versions aligned across every package manifest", () => {
+    const cargoVersion = cargoManifest.match(
+      /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"\s*$/m,
+    )?.[1];
+
+    expect(config.productName).toBe("Focus Garden");
+    expect(config.identifier).toBe("com.focusgarden.desktop");
+    expect(config.bundle.targets).toEqual(["nsis"]);
+    expect(config.version).toBe(packageMetadata.version);
+    expect(cargoVersion).toBe(packageMetadata.version);
+    expect(packageMetadata.scripts["release:verify:public"]).toContain("-PublicRelease");
   });
 });
