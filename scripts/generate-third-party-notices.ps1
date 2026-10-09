@@ -10,16 +10,18 @@ $noticeOutput = Join-Path $noticeWorkspace "THIRD_PARTY_NOTICES.txt"
 $noticeGenerationDirectory = Join-Path $noticeWorkspace "src-tauri\target\license-generation"
 $noticeRustOutput = Join-Path $noticeGenerationDirectory "rust-notices.txt"
 
-function Get-NoticeSha256 {
+function Get-NoticeTextSha256 {
   param([string]$Path)
 
+  $text = [System.IO.File]::ReadAllText($Path)
+  $normalizedText = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  $bytes = $utf8.GetBytes($normalizedText)
   $hashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
-  $hashStream = [System.IO.File]::OpenRead($Path)
   try {
-    $hashBytes = $hashAlgorithm.ComputeHash($hashStream)
+    $hashBytes = $hashAlgorithm.ComputeHash($bytes)
     return [System.BitConverter]::ToString($hashBytes).Replace("-", "")
   } finally {
-    $hashStream.Dispose()
     $hashAlgorithm.Dispose()
   }
 }
@@ -69,8 +71,8 @@ $noticeParts.Add("")
 $noticeParts.Add("This file covers third-party software distributed with Focus Garden.")
 $noticeParts.Add("It does not grant a license to Focus Garden itself.")
 $noticeParts.Add("")
-$noticeParts.Add("Cargo.lock SHA-256: $(Get-NoticeSha256 -Path $noticeCargoLock)")
-$noticeParts.Add("package-lock.json SHA-256: $(Get-NoticeSha256 -Path $noticePackageLock)")
+$noticeParts.Add("Cargo.lock SHA-256: $(Get-NoticeTextSha256 -Path $noticeCargoLock)")
+$noticeParts.Add("package-lock.json SHA-256: $(Get-NoticeTextSha256 -Path $noticePackageLock)")
 $noticeParts.Add("Generator: $((& cargo about --version) -join ' ')")
 $noticeParts.Add("")
 $noticeParts.Add("JAVASCRIPT DEPENDENCIES")

@@ -5,16 +5,18 @@ $noticeCargoLock = Join-Path $noticeWorkspace "src-tauri\Cargo.lock"
 $noticePackageLock = Join-Path $noticeWorkspace "package-lock.json"
 $noticePath = Join-Path $noticeWorkspace "THIRD_PARTY_NOTICES.txt"
 
-function Get-NoticeSha256 {
+function Get-NoticeTextSha256 {
   param([string]$Path)
 
+  $text = [System.IO.File]::ReadAllText($Path)
+  $normalizedText = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  $bytes = $utf8.GetBytes($normalizedText)
   $hashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
-  $hashStream = [System.IO.File]::OpenRead($Path)
   try {
-    $hashBytes = $hashAlgorithm.ComputeHash($hashStream)
+    $hashBytes = $hashAlgorithm.ComputeHash($bytes)
     return [System.BitConverter]::ToString($hashBytes).Replace("-", "")
   } finally {
-    $hashStream.Dispose()
     $hashAlgorithm.Dispose()
   }
 }
@@ -24,8 +26,8 @@ if (-not (Test-Path -LiteralPath $noticePath -PathType Leaf)) {
 }
 
 $noticeText = Get-Content -LiteralPath $noticePath -Raw
-$expectedCargoHash = Get-NoticeSha256 -Path $noticeCargoLock
-$expectedPackageHash = Get-NoticeSha256 -Path $noticePackageLock
+$expectedCargoHash = Get-NoticeTextSha256 -Path $noticeCargoLock
+$expectedPackageHash = Get-NoticeTextSha256 -Path $noticePackageLock
 
 if (-not $noticeText.Contains("Cargo.lock SHA-256: $expectedCargoHash")) {
   throw "Third-party notice verification failed: Cargo.lock has changed. Run npm run licenses:generate."
