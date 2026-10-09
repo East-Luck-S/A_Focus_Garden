@@ -140,3 +140,4 @@ Generated frontend output, Rust targets, and native bundles are intentionally ex
 - [Release history](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
+- [Windows signing](docs/WINDOWS_SIGNING.md)

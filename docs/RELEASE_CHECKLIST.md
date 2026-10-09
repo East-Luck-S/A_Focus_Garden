@@ -22,7 +22,7 @@ npm run release:build
 For a public build, require a clean source tree and valid Windows signatures:
 
 ```powershell
-npm run release:verify:public
+npm run release:build:public
 ```
 
 Archive `src-tauri/target/release/release-manifest.json` with the exact executable and installer it describes. Record the manifest SHA-256 printed by the verifier in the release log.

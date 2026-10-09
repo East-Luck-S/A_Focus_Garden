@@ -131,3 +131,9 @@ The distributed notice uses original npm runtime license files and cargo-about o
 **Status:** Accepted and implemented for M13
 
 Every successful artifact scan writes an ignored `release-manifest.json` beside the release executable. It records only workspace-relative paths, the exact source commit and cleanliness, synchronized product identity/version, lockfile and third-party notice hashes, artifact hashes, and Authenticode status. The verifier prints the manifest hash so it can be archived with the corresponding binaries. Internal candidates may record an unsigned or dirty state, but the explicit public-release mode requires both a clean source tree and valid signatures; a normal internal scan can no longer be mistaken for public-release acceptance.
+
+## ADR-023: Tauri owns the complete Windows signing sequence
+
+**Status:** Accepted and implemented for M13
+
+Public signing is supplied as a Git-ignored Tauri config overlay containing only a certificate-store thumbprint, SHA-256 digest selection, and certificate-authority timestamp URL. The release builder rejects tracked configs, secret material, malformed values, and missing, expired, or private-key-less certificates before invoking Tauri. Tauri signs the application before constructing NSIS and signs the bundle in its native order; post-build signing of only the outer installer is forbidden because it would leave the installed executable unsigned. The strict verifier then checks both final artifacts independently.

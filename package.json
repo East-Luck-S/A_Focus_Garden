@@ -16,6 +16,7 @@
     "licenses:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-third-party-notices.ps1",
     "preview": "vite preview",
     "release:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
+    "release:build:public": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1 -PublicRelease -SigningConfig src-tauri/tauri.signing.local.conf.json",
     "release:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
     "release:verify:public": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -PublicRelease",
     "tauri": "tauri"

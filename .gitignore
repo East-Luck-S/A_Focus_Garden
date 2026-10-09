@@ -13,6 +13,7 @@ dist-ssr
 coverage
 *.tsbuildinfo
 *.local
+src-tauri/tauri.signing.local.conf.json
 
 # Rust / Tauri build output
 src-tauri/gen

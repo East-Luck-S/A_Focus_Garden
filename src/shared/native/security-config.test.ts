@@ -96,6 +96,8 @@ describe("release security configuration", () => {
     expect(config.bundle.targets).toEqual(["nsis"]);
     expect(config.version).toBe(packageMetadata.version);
     expect(cargoVersion).toBe(packageMetadata.version);
+    expect(packageMetadata.scripts["release:build:public"]).toContain("-PublicRelease");
+    expect(packageMetadata.scripts["release:build:public"]).toContain("tauri.signing.local.conf.json");
     expect(packageMetadata.scripts["release:verify:public"]).toContain("-PublicRelease");
   });
 });
