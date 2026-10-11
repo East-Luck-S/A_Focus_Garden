@@ -130,7 +130,7 @@ The distributed notice uses original npm runtime license files and cargo-about o
 
 **Status:** Accepted and implemented for M13
 
-Every successful artifact scan writes an ignored `release-manifest.json` beside the release executable. It records only workspace-relative paths, the exact source commit and cleanliness, synchronized product identity/version, lockfile and third-party notice hashes, artifact hashes, and Authenticode status. The verifier prints the manifest hash so it can be archived with the corresponding binaries. Internal candidates may record an unsigned or dirty state, but the explicit public-release mode requires both a clean source tree and valid signatures; a normal internal scan can no longer be mistaken for public-release acceptance.
+Every successful artifact scan writes an ignored `release-manifest.json` beside the release executable. It records only workspace-relative paths, the exact source commit and cleanliness, synchronized product identity/version, lockfile and third-party notice hashes, artifact hashes, and Authenticode status. The verifier prints the manifest hash so it can be archived with the corresponding binaries. Internal candidates may record an unsigned or dirty state, but the explicit public-release mode requires both a clean source tree and valid signatures; a normal internal scan can no longer be mistaken for public-release acceptance. Trusted branch and manual CI runs also build and scan an internal NSIS candidate from a clean checkout, but deliberately do not upload that unsigned binary.
 
 ## ADR-023: Tauri owns the complete Windows signing sequence
 

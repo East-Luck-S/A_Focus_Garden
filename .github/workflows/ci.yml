@@ -60,3 +60,39 @@ jobs:
 
       - name: Lint Rust
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc -- -D warnings
+
+  package:
+    name: Build and verify internal NSIS candidate
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Verify third-party notices
+        run: npm run licenses:verify
+
+      - name: Build and scan NSIS candidate
+        run: npm run release:build

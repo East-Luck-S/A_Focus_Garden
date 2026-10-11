@@ -60,6 +60,10 @@ describe("release security configuration", () => {
     join(process.cwd(), "src-tauri", "Cargo.toml"),
     "utf8",
   );
+  const continuousIntegrationWorkflow = readFileSync(
+    join(process.cwd(), ".github", "workflows", "ci.yml"),
+    "utf8",
+  );
 
   it("keeps the production CSP local and free of development or inline-script allowances", () => {
     expect(config.app.security.csp).not.toMatch(/http:\/\/localhost:1420|ws:\/\/|unsafe-inline|unsafe-eval|\*/);
@@ -99,5 +103,12 @@ describe("release security configuration", () => {
     expect(packageMetadata.scripts["release:build:public"]).toContain("-PublicRelease");
     expect(packageMetadata.scripts["release:build:public"]).toContain("tauri.signing.local.conf.json");
     expect(packageMetadata.scripts["release:verify:public"]).toContain("-PublicRelease");
+  });
+
+  it("builds and scans an NSIS candidate in CI without publishing unsigned artifacts", () => {
+    expect(continuousIntegrationWorkflow).toContain("Build and verify internal NSIS candidate");
+    expect(continuousIntegrationWorkflow).toContain("if: github.event_name != 'pull_request'");
+    expect(continuousIntegrationWorkflow).toContain("run: npm run release:build");
+    expect(continuousIntegrationWorkflow).not.toMatch(/actions\/upload-artifact|gh release create/);
   });
 });
