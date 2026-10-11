@@ -137,3 +137,9 @@ Every successful artifact scan writes an ignored `release-manifest.json` beside 
 **Status:** Accepted and implemented for M13
 
 Public signing is supplied as a Git-ignored Tauri config overlay containing only a certificate-store thumbprint, SHA-256 digest selection, and certificate-authority timestamp URL. The release builder rejects tracked configs, secret material, malformed values, and missing, expired, or private-key-less certificates before invoking Tauri. Tauri signs the application before constructing NSIS and signs the bundle in its native order; post-build signing of only the outer installer is forbidden because it would leave the installed executable unsigned. The strict verifier then checks both final artifacts independently.
+
+## ADR-024: Public builds require reviewed product terms in the installer
+
+**Status:** Accepted and implemented for M13
+
+The repository does not infer or generate Focus Garden's distribution terms. A public build requires exactly one Human-reviewed product terms file at `LICENSE`, `LICENSE.txt`, or `EULA.txt`; that file must be tracked by Git and referenced by Tauri `bundle.licenseFile`. Internal candidates remain buildable while the legal decision is open, but no signed public package can pass by omitting or substituting the product terms.

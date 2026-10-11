@@ -29,6 +29,42 @@ if ($SigningConfig -and -not $PublicRelease) {
 }
 
 if ($PublicRelease) {
+  $releaseProductLicenseCandidates = @(
+    "LICENSE"
+    "LICENSE.txt"
+    "EULA.txt"
+  )
+  $releaseProductLicenseRelativePaths = @(
+    $releaseProductLicenseCandidates | Where-Object {
+      Test-Path -LiteralPath (Join-Path $releaseWorkspace $_) -PathType Leaf
+    }
+  )
+  if ($releaseProductLicenseRelativePaths.Count -ne 1) {
+    throw "Public release build failed: exactly one reviewed product license is required at LICENSE, LICENSE.txt, or EULA.txt."
+  }
+  $releaseProductLicenseRelativePath = $releaseProductLicenseRelativePaths[0]
+  $releaseProductLicensePath = (Resolve-Path -LiteralPath (Join-Path $releaseWorkspace $releaseProductLicenseRelativePath)).Path
+  $releaseTrackedProductLicense = @(& git -C $releaseWorkspace ls-files -- $releaseProductLicenseRelativePath)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Public release build failed: unable to inspect product license tracking status."
+  }
+  if ($releaseTrackedProductLicense.Count -ne 1) {
+    throw "Public release build failed: the reviewed product license must be tracked by Git."
+  }
+
+  $releaseProductionConfigPath = Join-Path $releaseWorkspace "src-tauri\tauri.conf.json"
+  $releaseProductionConfig = [System.IO.File]::ReadAllText($releaseProductionConfigPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+  $releaseConfiguredLicenseFile = [string]$releaseProductionConfig.bundle.licenseFile
+  if (-not $releaseConfiguredLicenseFile) {
+    throw "Public release build failed: bundle.licenseFile must include the reviewed product license in the installer."
+  }
+  $releaseConfiguredLicensePath = [System.IO.Path]::GetFullPath(
+    (Join-Path (Split-Path -Parent $releaseProductionConfigPath) $releaseConfiguredLicenseFile)
+  )
+  if (-not $releaseConfiguredLicensePath.Equals($releaseProductLicensePath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Public release build failed: bundle.licenseFile must point to the single reviewed product license."
+  }
+
   if (-not (Test-Path -LiteralPath $SigningConfig -PathType Leaf)) {
     throw "Public release build failed: signing config is missing. Copy the example to src-tauri/tauri.signing.local.conf.json."
   }

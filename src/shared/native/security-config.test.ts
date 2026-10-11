@@ -64,6 +64,10 @@ describe("release security configuration", () => {
     join(process.cwd(), ".github", "workflows", "ci.yml"),
     "utf8",
   );
+  const releaseBuildScript = readFileSync(
+    join(process.cwd(), "scripts", "build-release.ps1"),
+    "utf8",
+  );
 
   it("keeps the production CSP local and free of development or inline-script allowances", () => {
     expect(config.app.security.csp).not.toMatch(/http:\/\/localhost:1420|ws:\/\/|unsafe-inline|unsafe-eval|\*/);
@@ -110,5 +114,12 @@ describe("release security configuration", () => {
     expect(continuousIntegrationWorkflow).toContain("if: github.event_name != 'pull_request'");
     expect(continuousIntegrationWorkflow).toContain("run: npm run release:build");
     expect(continuousIntegrationWorkflow).not.toMatch(/actions\/upload-artifact|gh release create/);
+  });
+
+  it("fails public builds closed until one tracked product license is bundled", () => {
+    expect(releaseBuildScript).toContain("exactly one reviewed product license is required");
+    expect(releaseBuildScript).toContain("the reviewed product license must be tracked by Git");
+    expect(releaseBuildScript).toContain("bundle.licenseFile must include the reviewed product license");
+    expect(releaseBuildScript).toContain("bundle.licenseFile must point to the single reviewed product license");
   });
 });

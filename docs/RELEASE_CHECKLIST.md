@@ -33,7 +33,7 @@ Archive `src-tauri/target/release/release-manifest.json` with the exact executab
 - Regenerate `THIRD_PARTY_NOTICES.txt` after every intentional dependency change, review the collected license text, and verify that its embedded lockfile hashes are current.
 - Confirm that the installed `THIRD_PARTY_NOTICES.txt` exactly matches the reviewed source file.
 - Open the Chinese About dialog and confirm the displayed package version, local-only data statement, and third-party notice filename match the reviewed build.
-- Confirm the Human-selected Focus Garden license/EULA and publisher identity.
+- Confirm the Human-selected Focus Garden license/EULA and publisher identity. Keep exactly one reviewed product terms file at `LICENSE`, `LICENSE.txt`, or `EULA.txt`, track it in Git, and point Tauri `bundle.licenseFile` to it; the public build fails closed otherwise.
 - Do not publish an artifact reported as `NotSigned`.
 
 ## Upgrade and data-safety gates
